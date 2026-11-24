@@ -154,6 +154,7 @@
     });
     const prev = state.view;
     state.view = id;
+    document.body.classList.toggle('view-pages', id === 'viewPages');
     if (id !== 'welcome') store.set('view', id);
     emit('viewchange', { view: id, prev });
     if (id === 'viewListen') highlight(true);
@@ -221,7 +222,7 @@
     } catch (e) { /* nessuna modifica salvata */ }
 
     const title = name.replace(/\.pdf$/i, '');
-    el.appTitle.textContent = title;
+    el.appTitle.textContent = name;
     document.title = title + ' – Lettore di Libri';
     el.pageCount.textContent = pdf.numPages;
     el.pageInput.max = pdf.numPages;
@@ -243,26 +244,51 @@
     if (state.pageCache.has(n)) return state.pageCache.get(n);
     const page = await state.pdf.getPage(n);
     const content = await page.getTextContent();
-    let text = '';
+    // Righe con la loro dimensione di carattere (serve a riconoscere il titolo della pagina).
+    const lines = [];
+    let cur = null;
     let lastY = null;
     for (const item of content.items) {
       if (typeof item.str !== 'string') continue;
-      const y = item.transform ? item.transform[5] : null;
-      if (lastY !== null && y !== null && Math.abs(y - lastY) > 2 && text && !/\s$/.test(text)) {
-        text += '\n';
+      const t = item.transform || [1, 0, 0, 1, 0, 0];
+      const y = t[5];
+      const size = Math.hypot(t[2], t[3]) || item.height || 0;
+      if (!cur || (lastY !== null && Math.abs(y - lastY) > 2)) {
+        cur = { text: '', size: 0, chars: 0 };
+        lines.push(cur);
       }
-      text += item.str;
-      if (item.hasEOL) text += '\n';
-      if (y !== null) lastY = y;
+      cur.text += item.str;
+      if (item.str.trim()) { cur.size = Math.max(cur.size, size); cur.chars += item.str.length; }
+      if (item.hasEOL) { cur = null; lastY = null; } else lastY = y;
     }
-    text = text
+    const clean = (s) => s
       .replace(/([\p{L}])[-­]\s*\n\s*([\p{Ll}])/gu, '$1$2') // parole spezzate a fine riga
       .replace(/\s*\n\s*/g, ' ')
       .replace(/[ \t ]+/g, ' ')
       .trim();
-    const sentences = splitSentences(text);
+    const real = lines.filter((l) => l.text.trim());
+    // Dimensione del testo normale: quella che copre più caratteri.
+    const bySize = new Map();
+    for (const l of real) { const k = Math.round(l.size * 2) / 2; bySize.set(k, (bySize.get(k) || 0) + l.chars); }
+    let body = 0, most = -1;
+    bySize.forEach((c, k) => { if (c > most) { most = c; body = k; } });
+    // Titolo: le prime righe scritte più in grande del testo normale.
+    let h = 0;
+    while (h < real.length && h < 4 && body && real[h].size >= body * 1.18 && real[h].text.trim().length <= 120) h++;
+    if (h === real.length) h = 0; // tutta la pagina in grande: nessun titolo
+    const heading = clean(real.slice(0, h).map((l) => l.text).join('\n'));
+    const rest = clean(real.slice(h).map((l) => l.text).join('\n'));
+    const sentences = (heading ? [heading] : []).concat(splitSentences(rest));
+    sentences.head = heading ? 1 : 0;
     state.pageCache.set(n, sentences);
     return sentences;
+  }
+
+  // Testo da pronunciare per la frase i (al titolo aggiunge un punto, per una pausa naturale).
+  function spoken(list, i) {
+    const s = list[i] || '';
+    const t = speechText(s);
+    return i < (list.head || 0) && !/[.!?:;…]$/.test(t) ? t + '.' : t;
   }
 
   const segmenter = (window.Intl && Intl.Segmenter)
@@ -315,7 +341,7 @@
       const frag = document.createDocumentFragment();
       state.sentences.forEach((s, i) => {
         const span = document.createElement('span');
-        span.className = 's';
+        span.className = i < (state.sentences.head || 0) ? 's h' : 's';
         span.dataset.i = i;
         span.textContent = s;
         frag.appendChild(span);
@@ -462,7 +488,7 @@
   function updateNeuralUi() {
     if (!el.neuralBox) return;
     el.neuralBox.classList.toggle('hidden', !neuralOk);
-    if (!neuralOk) { el.btnSettings.textContent = '⚙️ Voce'; return; }
+    if (!neuralOk) { el.btnSettings.classList.remove('has-tip'); return; }
     const act = activeNeural();
     el.neuralBox.querySelectorAll('.nv').forEach((row) => {
       const v = NV.get(row.dataset.voice);
@@ -493,7 +519,7 @@
     el.paolaStyleRow.classList.toggle('hidden', !(act && act.styles));
     el.saraPrep.classList.toggle('hidden', !(act && act.slow && act.state !== 'error'));
     if (act && act.slow) updatePrepUi(act);
-    el.btnSettings.textContent = act ? '⚙️ Voce' : '⚙️ Voce ✨';
+    el.btnSettings.classList.toggle('has-tip', !act); // pallino: c'è una voce più naturale da provare
     if (state.mode === 'playing' && act && act.state === 'loading') setStatus(msg);
   }
 
@@ -521,10 +547,12 @@
   async function upcoming(maxSentences, maxPages) {
     const out = [];
     let page = state.page;
-    let list = state.sentences.slice(state.sentence);
+    let list = state.sentences;
+    let from = state.sentence;
     let pages = 1;
     for (;;) {
-      for (const s of list) { out.push(speechText(s)); if (out.length >= maxSentences) return out; }
+      for (let i = from; i < list.length; i++) { out.push(spoken(list, i)); if (out.length >= maxSentences) return out; }
+      from = 0;
       const np = nextReadablePage(page);
       if (!np || pages >= maxPages) return out;
       page = np;
@@ -646,7 +674,7 @@
 
     if (isNeural()) { speakNeural(activeNeural(), myToken); return; }
 
-    const u = new SpeechSynthesisUtterance(speechText(state.sentences[state.sentence]));
+    const u = new SpeechSynthesisUtterance(spoken(state.sentences, state.sentence));
     const voice = currentVoice();
     if (voice) { u.voice = voice; u.lang = voice.lang; } else { u.lang = 'it-IT'; }
     u.rate = parseFloat(el.rateInput.value) || 1;
@@ -674,7 +702,7 @@
 
   function speakNeural(v, myToken) {
     const rate = parseFloat(el.rateInput.value) || 1;
-    const text = speechText(state.sentences[state.sentence]);
+    const text = spoken(state.sentences, state.sentence);
     if (v.state !== 'ready') {
       setStatus(v.state === 'loading' ? 'Preparo la voce ' + v.name + '…' : 'Avvio la voce ' + v.name + '…');
       v.load().catch(() => {});
@@ -704,10 +732,10 @@
     if (!v.slow) {
       // Prepara la frase successiva (anche della pagina dopo), così non ci sono pause.
       const nextText = state.sentences[state.sentence + 1];
-      if (nextText) v.prefetch(speechText(nextText), rate);
+      if (nextText) v.prefetch(spoken(state.sentences, state.sentence + 1), rate);
       else {
         const np = nextReadablePage(state.page);
-        if (np) getPageText(np).then((ss) => { if (ss[0]) v.prefetch(speechText(ss[0]), rate); }).catch(() => {});
+        if (np) getPageText(np).then((ss) => { if (ss[0]) v.prefetch(spoken(ss, 0), rate); }).catch(() => {});
       }
     }
   }
