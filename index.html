@@ -256,7 +256,31 @@
           </button>
         </div>
         <div class="statusrow"><span id="status" class="status" aria-live="polite"></span></div>
-        <div id="settings" class="settings hidden">
+      </div>
+
+      <div id="deletedNote" class="note hidden">Questa pagina è segnata come eliminata nelle modifiche.</div>
+      <article id="pageText" class="card pagetext" aria-label="Testo della pagina"></article>
+      <p class="hint">Tocca una frase per iniziare a leggere da lì.</p>
+    </section>
+
+    <!-- Pagine / documento -->
+    <section id="viewPages" class="view" aria-label="Pagine">
+      <div id="pagesScroll" class="pages-scroll">
+        <div id="pagesInner" class="pages-inner"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="settingsBackdrop" class="sheet-backdrop hidden"></div>
+  <div id="settings" class="settings-sheet hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="sheet-grab" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="settingsTitle">Voce e lettura</h2>
+      <button id="settingsClose" class="sheet-close" type="button" aria-label="Chiudi">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body">
           <div id="neuralBox" class="neural-box hidden">
             <div class="neural-head">✨ <strong>Voci naturali</strong></div>
             <p class="neural-text">Voci italiane neurali che lavorano direttamente sul telefono, anche senza internet.
@@ -352,23 +376,10 @@
           </div>
           <div class="field">
             <label for="fontInput">Dimensione testo</label>
-            <input id="fontInput" type="range" min="16" max="36" step="1" value="22">
+            <input id="fontInput" type="range" min="14" max="32" step="1" value="19">
           </div>
-        </div>
-      </div>
-
-      <div id="deletedNote" class="note hidden">Questa pagina è segnata come eliminata nelle modifiche.</div>
-      <article id="pageText" class="card pagetext" aria-label="Testo della pagina"></article>
-      <p class="hint">Tocca una frase per iniziare a leggere da lì.</p>
-    </section>
-
-    <!-- Pagine / documento -->
-    <section id="viewPages" class="view" aria-label="Pagine">
-      <div id="pagesScroll" class="pages-scroll">
-        <div id="pagesInner" class="pages-inner"></div>
-      </div>
-    </section>
-  </main>
+    </div>
+  </div>
 
   <!-- Barra di stato dell'editor -->
   <div id="statusbar" class="statusbar">

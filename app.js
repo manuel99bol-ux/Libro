@@ -19,6 +19,9 @@
     btnNext: $('btnNext'),
     btnSettings: $('btnSettings'),
     settings: $('settings'),
+    settingsBackdrop: $('settingsBackdrop'),
+    settingsClose: $('settingsClose'),
+    settingsBody: document.querySelector('#settings .sheet-body'),
     pageInput: $('pageInput'),
     pageCount: $('pageCount'),
     voiceSelect: $('voiceSelect'),
@@ -374,7 +377,8 @@
     const cur = el.pageText.querySelector('.s[data-i="' + state.sentence + '"]');
     if (cur) {
       cur.classList.add('current');
-      if (scroll && state.view === 'viewListen') cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      // Niente salti mentre è aperto il pannello della voce.
+      if (scroll && state.view === 'viewListen' && el.settings.classList.contains('hidden')) cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
   }
 
@@ -914,10 +918,28 @@
     const n = parseInt(el.pageInput.value, 10) || 1;
     if (n !== state.page) goToPage(n);
   });
-  el.btnSettings.addEventListener('click', () => {
-    const open = el.settings.classList.toggle('hidden') === false;
+  // Pannello «Voce e lettura»: sale dal basso, con uno scorrimento tutto suo.
+  function setSettings(open) {
+    el.settings.classList.toggle('hidden', !open);
+    el.settingsBackdrop.classList.toggle('hidden', !open);
+    document.body.classList.toggle('sheet-open', open);
     el.btnSettings.setAttribute('aria-expanded', String(open));
-  });
+    if (open) { el.settingsBody.scrollTop = 0; el.settingsClose.focus({ preventScroll: true }); }
+    else { el.btnSettings.focus({ preventScroll: true }); highlight(true); }
+  }
+  App.setSettings = setSettings;
+  el.btnSettings.addEventListener('click', () => setSettings(el.settings.classList.contains('hidden')));
+  el.settingsClose.addEventListener('click', () => setSettings(false));
+  el.settingsBackdrop.addEventListener('click', () => setSettings(false));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el.settings.classList.contains('hidden')) setSettings(false); });
+
+  // Scorrendo il testo l'intestazione si fa compatta, così resta più spazio per leggere.
+  const listenView = document.getElementById('viewListen');
+  listenView.addEventListener('scroll', () => {
+    const was = document.body.classList.contains('hero-compact');
+    const compact = was ? listenView.scrollTop > 4 : listenView.scrollTop > 48;
+    if (compact !== was) document.body.classList.toggle('hero-compact', compact);
+  }, { passive: true });
 
   el.pageText.addEventListener('click', (e) => {
     const span = e.target.closest('.s');
@@ -1099,7 +1121,7 @@
     const rate = store.get('rate', '1');
     el.rateInput.value = rate;
     el.rateValue.textContent = parseFloat(rate).toFixed(1) + '×';
-    const font = store.get('font', '22');
+    const font = store.get('font', '19');
     el.fontInput.value = font;
     document.documentElement.style.setProperty('--font-size', font + 'px');
 
