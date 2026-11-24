@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1f4e79">
+  <title>Lettore di Libri</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>📖 Lettore di Libri</h1>
+    <label class="btn btn-file">
+      Apri PDF
+      <input id="fileInput" type="file" accept="application/pdf,.pdf" hidden>
+    </label>
+  </header>
+
+  <main>
+    <section id="welcome" class="card welcome">
+      <p class="big">Scegli un libro in formato PDF e premi <strong>Leggi</strong>.</p>
+      <p>Il libro resta sul tuo dispositivo: nessun dato viene inviato in rete.
+         Quando riapri la pagina, la lettura riprende dal punto in cui eri arrivato.</p>
+      <label class="btn btn-primary btn-large">
+        📂 Scegli un PDF
+        <input id="fileInput2" type="file" accept="application/pdf,.pdf" hidden>
+      </label>
+    </section>
+
+    <section id="reader" class="hidden">
+      <div class="bookinfo">
+        <span id="bookTitle" class="booktitle"></span>
+        <span id="status" class="status" aria-live="polite"></span>
+      </div>
+
+      <div class="controls card">
+        <div class="row main-buttons">
+          <button id="btnPrev" class="btn" title="Pagina precedente" aria-label="Pagina precedente">⏮<span>Pag. prec.</span></button>
+          <button id="btnPlay" class="btn btn-primary" aria-label="Leggi">▶<span>Leggi</span></button>
+          <button id="btnPause" class="btn btn-primary hidden" aria-label="Pausa">⏸<span>Pausa</span></button>
+          <button id="btnResume" class="btn btn-primary hidden" aria-label="Riprendi">⏯<span>Riprendi</span></button>
+          <button id="btnStop" class="btn" aria-label="Stop">⏹<span>Stop</span></button>
+          <button id="btnNext" class="btn" title="Pagina successiva" aria-label="Pagina successiva">⏭<span>Pag. succ.</span></button>
+        </div>
+
+        <div class="row pagenav">
+          <label for="pageInput">Pagina</label>
+          <input id="pageInput" type="number" min="1" value="1" inputmode="numeric">
+          <span>di <span id="pageCount">–</span></span>
+        </div>
+
+        <details class="settings">
+          <summary>⚙️ Voce e velocità</summary>
+          <div class="field">
+            <label for="voiceSelect">Voce</label>
+            <select id="voiceSelect"></select>
+          </div>
+          <div class="field">
+            <label for="rateInput">Velocità: <strong id="rateValue">1.0×</strong></label>
+            <input id="rateInput" type="range" min="0.5" max="2" step="0.1" value="1">
+          </div>
+          <div class="field">
+            <label for="fontInput">Dimensione testo</label>
+            <input id="fontInput" type="range" min="16" max="36" step="1" value="22">
+          </div>
+        </details>
+      </div>
+
+      <article id="pageText" class="card pagetext" aria-label="Testo della pagina"></article>
+      <p class="hint">Suggerimento: tocca una frase per iniziare a leggere da lì.</p>
+    </section>
+  </main>
+
+  <div id="loading" class="loading hidden" role="status">Caricamento del libro…</div>
+
+  <script src="lib/pdf.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
