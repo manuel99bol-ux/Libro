@@ -59,8 +59,9 @@ la maniglia rotonda. Un secondo tocco su una casella di testo la rimette in modi
 scorre e si ingrandisce anche mentre si disegna. Le modifiche si salvano da sole sul telefono.
 
 **Salva PDF** crea «… (modificato).pdf» con tutte le modifiche (anche ordine, rotazione ed eliminazione
-delle pagine), da scaricare o condividere. L'originale non viene toccato e il file esportato si può
-riaprire nell'app e modificare di nuovo.
+delle pagine), da salvare o condividere. L'originale non viene toccato. Con **«Continua con la versione
+modificata»** l'app apre subito il nuovo PDF al posto dell'originale e lo ricorda alla prossima apertura.
+Anche senza salvare, le modifiche restano nell'app e la lettura ad alta voce legge già il testo nuovo.
 
 ## Come avviarla
 
@@ -80,8 +81,11 @@ Fai doppio clic su `index.html`. Oppure, in un terminale nella cartella:
 - Le voci dipendono dal sistema. Su Android se ne installano altre da *Impostazioni → Sintesi vocale*,
   su iPhone da *Impostazioni → Accessibilità → Contenuti letti ad alta voce → Voci*.
 - I PDF scansionati (solo immagini) si vedono e si annotano, ma non si possono leggere ad alta voce.
-- Il testo originale modificato viene coperto, non cancellato: nel PDF esportato non si vede più, ma un
-  programma che estrae il testo (o un «copia e incolla» da quella zona) può ancora trovarlo.
+- Nel PDF salvato il testo originale delle righe modificate viene tolto davvero e quello nuovo è scritto nello
+  stesso punto, così anche la lettura ad alta voce e il «copia e incolla» trovano il testo nuovo. Se in una pagina
+  il testo è dentro elementi complessi (per esempio moduli incorporati), l'app torna a coprirlo e scriverci sopra.
+- La riga modificata usa uno dei tre caratteri standard (simili ad Arial, Times New Roman e Courier New):
+  se il libro usa un carattere diverso, la differenza può notarsi leggermente.
 - Se una riga è su uno sfondo sfumato o su un'immagine, la copertura usa un solo colore e può notarsi.
 - I caratteri disponibili sono i tre standard del PDF (simili ad Arial, Times New Roman e Courier New).
 - Nei testi aggiunti si possono usare lettere accentate e la punteggiatura comune; simboli speciali

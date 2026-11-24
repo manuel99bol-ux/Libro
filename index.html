@@ -408,8 +408,7 @@
   </div>
 
   <nav id="tabbar" class="tabbar hidden" aria-label="Sezioni">
-    <span class="blob blob-green" aria-hidden="true"></span>
-    <span class="blob blob-pink" aria-hidden="true"></span>
+    <span class="blobs" aria-hidden="true"><span class="blob blob-green"></span><span class="blob blob-pink"></span></span>
     <button class="tab" data-view="viewListen">
       <span class="tab-pill">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><rect x="3" y="13.5" width="5" height="7.5" rx="2" fill="currentColor"/><rect x="16" y="13.5" width="5" height="7.5" rx="2" fill="currentColor"/></svg>
@@ -435,8 +434,10 @@
       <div class="dialog-buttons">
         <button value="cancel" class="btn">Chiudi</button>
         <button value="share" id="shareBtn" class="btn hidden">📤 Condividi</button>
-        <button value="download" class="btn btn-primary">⬇️ Scarica</button>
+        <button value="download" class="btn btn-primary">⬇️ Salva sul dispositivo</button>
       </div>
+      <button value="continue" class="btn continue-btn">📖 Continua con la versione modificata</button>
+      <p class="continue-note">L'app apre il PDF modificato al posto dell'originale e lo ricorda anche alla prossima apertura.</p>
     </form>
   </dialog>
 

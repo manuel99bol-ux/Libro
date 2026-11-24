@@ -136,6 +136,8 @@
   let editsTimer = null;
   function saveEdits() {
     if (!state.bookKey) return;
+    state.pageCache.clear();
+    state.editsDirty = true;
     clearTimeout(editsTimer);
     const key = 'edits:' + state.bookKey;
     editsTimer = setTimeout(() => { idb.put(key, App.edits).catch(() => {}); }, 300);
@@ -171,7 +173,10 @@
     document.body.classList.toggle('view-pages', id === 'viewPages');
     if (id !== 'welcome') store.set('view', id);
     emit('viewchange', { view: id, prev });
-    if (id === 'viewListen') highlight(true);
+    if (id === 'viewListen' && state.editsDirty && state.pdf) {
+      state.editsDirty = false;
+      showPage(state.page, state.sentence); // il testo della pagina potrebbe essere cambiato nell'editor
+    } else if (id === 'viewListen') highlight(true);
   }
 
   // ---------- pdf.js ----------
@@ -206,6 +211,16 @@
     const key = file.name + '|' + file.size;
     idb.put('last', { key, name: file.name, data: buffer.slice(0) }).catch(() => {});
     await loadPdf(new Uint8Array(buffer), file.name, key);
+  }
+
+  // Apre un PDF già in memoria (per esempio la versione appena modificata) come libro corrente.
+  async function openPdfBytes(buffer, name) {
+    const key = name + '|' + buffer.byteLength;
+    const page = state.page || 1;
+    if (!store.get('pos:' + key, null)) store.set('pos:' + key, { page, sentence: 0 });
+    idb.put('last', { key, name, data: buffer.slice(0) }).catch(() => {});
+    await loadPdf(new Uint8Array(buffer), name, key);
+    toast('Ora stai usando «' + name + '»');
   }
 
   async function loadPdf(data, name, key) {
@@ -258,6 +273,8 @@
     if (state.pageCache.has(n)) return state.pageCache.get(n);
     const page = await state.pdf.getPage(n);
     const content = await page.getTextContent();
+    // Righe modificate nell'editor: il testo coperto non si legge, al suo posto si legge quello nuovo.
+    const repl = editedLines(String(n), page);
     // Righe con la loro dimensione di carattere (serve a riconoscere il titolo della pagina).
     const lines = [];
     let cur = null;
@@ -265,6 +282,16 @@
     for (const item of content.items) {
       if (typeof item.str !== 'string') continue;
       const t = item.transform || [1, 0, 0, 1, 0, 0];
+      const hit = repl.find((r) => t[4] >= r.x0 && t[4] <= r.x1 && t[5] >= r.y0 && t[5] <= r.y1);
+      if (hit) {
+        if (!hit.used && hit.text) {
+          hit.used = true;
+          lines.push({ text: hit.text, size: hit.size, chars: hit.text.length });
+        }
+        cur = null;
+        lastY = null;
+        continue;
+      }
       const y = t[5];
       const size = Math.hypot(t[2], t[3]) || item.height || 0;
       if (!cur || (lastY !== null && Math.abs(y - lastY) > 2)) {
@@ -296,6 +323,34 @@
     sentences.head = heading ? 1 : 0;
     state.pageCache.set(n, sentences);
     return sentences;
+  }
+
+  // Righe del PDF modificate (copertura + testo nuovo), con il riquadro nello spazio della pagina PDF.
+  function editedLines(key, page) {
+    const list = (App.edits && App.edits.ann[key]) || [];
+    if (!list.length) return [];
+    const view = page.view;
+    const W = view[2] - view[0], H = view[3] - view[1];
+    const fromDisp = (x, y, r) => (r === 90 ? [y, 1 - x] : r === 180 ? [1 - x, 1 - y] : r === 270 ? [1 - y, x] : [x, y]);
+    const toUser = (R, X, Y) => {
+      const d = R % 180 ? { w: H, h: W } : { w: W, h: H };
+      const uv = fromDisp(X / d.w, Y / d.h, R);
+      return [view[0] + uv[0] * W, view[3] - uv[1] * H];
+    };
+    const out = [];
+    list.forEach((o, i) => {
+      if (!(o.type === 'shape' && o.whiteout)) return;
+      const R = o.R || 0;
+      const pts = [[o.x, o.y], [o.x + o.w, o.y], [o.x, o.y + o.h], [o.x + o.w, o.y + o.h]].map((q) => toUser(R, q[0], q[1]));
+      const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+      const nx = list[i + 1];
+      const tb = nx && nx.type === 'tbox' && (nx.R || 0) === R && nx.y < o.y + o.h && nx.y + nx.size * 1.6 > o.y ? nx : null;
+      out.push({
+        x0: Math.min(...xs) - 1, x1: Math.max(...xs) + 1, y0: Math.min(...ys) - 1, y1: Math.max(...ys) + 1,
+        text: tb ? tb.text.replace(/\s+/g, ' ').trim() : '', size: tb ? tb.size : 0, used: false,
+      });
+    });
+    return out;
   }
 
   // Testo da pronunciare per la frase i (al titolo aggiunge un punto, per una pausa naturale).
@@ -1037,7 +1092,7 @@
     state, el, events, store, idb, edits: emptyEdits(), emptyEdits,
     play, pause, resume, stop, togglePlay, goToPage, showView,
     saveEdits, showLoading, hideLoading, toast, loadScript,
-    speechText,
+    speechText, openPdfBytes,
   };
 
   // ---------- Eventi ----------
