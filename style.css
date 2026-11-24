@@ -215,7 +215,19 @@ button { font: inherit; color: inherit; }
 }
 .neural-head { font-size: 1.05rem; }
 .neural-text { margin: 6px 0 10px; font-size: 0.92rem; color: var(--muted); line-height: 1.45; }
-.neural-btn { flex-direction: row; min-height: 48px; font-size: 1rem; width: 100%; }
+.nv {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 0; border-top: 1px solid var(--border);
+}
+.nv-info { display: flex; flex-direction: column; min-width: 0; }
+.nv-info span { font-size: 0.85rem; color: var(--muted); }
+.nv.on .nv-info strong::after { content: " ●"; color: var(--primary); }
+.nv-btn { flex: none; flex-direction: row; min-height: 44px; font-size: 0.9rem; padding: 6px 12px; }
+.nv-btn:disabled { opacity: 1; background: var(--highlight); }
+.sara-prep { margin-top: 8px; }
+.sara-row { display: flex; gap: 8px; margin-top: 8px; }
+.sara-row select { flex: 1; font: inherit; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); }
+.sara-row .btn { flex-direction: row; min-height: 48px; font-size: 0.95rem; }
 .neural-prog { width: 100%; height: 12px; accent-color: var(--primary); }
 .neural-msg { margin: 6px 0 0; font-size: 0.92rem; }
 .neural-style { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; font-size: 0.95rem; }

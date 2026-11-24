@@ -235,20 +235,39 @@
         </div>
         <div id="settings" class="settings hidden">
           <div id="neuralBox" class="neural-box hidden">
-            <div class="neural-head">✨ <strong>Voce naturale «Paola»</strong></div>
-            <p class="neural-text">Una voce italiana neurale, molto meno robotica, che lavora direttamente sul telefono, anche senza internet.
-              Si scarica una volta sola (circa 65 MB: meglio con il Wi-Fi).</p>
-            <button id="neuralBtn" class="btn btn-primary neural-btn" type="button">Scarica e usa Paola</button>
+            <div class="neural-head">✨ <strong>Voci naturali</strong></div>
+            <p class="neural-text">Voci italiane neurali che lavorano direttamente sul telefono, anche senza internet.
+              Ognuna si scarica una volta sola (meglio con il Wi-Fi).</p>
+            <div class="nv" data-voice="neural:paola">
+              <div class="nv-info"><strong>Paola</strong><span>Calma e scorrevole · legge subito</span></div>
+              <button class="btn nv-btn" type="button">Scarica</button>
+            </div>
+            <div class="nv" data-voice="neural:sara">
+              <div class="nv-info"><strong>Sara</strong><span>La più espressiva · prepara l'audio in anticipo</span></div>
+              <button class="btn nv-btn" type="button">Scarica</button>
+            </div>
             <progress id="neuralProg" class="neural-prog hidden" max="100" value="0"></progress>
-            <label class="neural-style" for="neuralStyle">Stile di lettura
+            <p id="neuralMsg" class="neural-msg" aria-live="polite"></p>
+            <label id="paolaStyleRow" class="neural-style hidden" for="neuralStyle">Stile di Paola
               <select id="neuralStyle">
-                <option value="naturale">Naturale (consigliato)</option>
-                <option value="calma">Calma: più lenta, pause lunghe</option>
-                <option value="espressiva">Espressiva: più intonazione</option>
+                <option value="calma">Calma (consigliato)</option>
+                <option value="naturale">Naturale</option>
+                <option value="espressiva">Espressiva</option>
                 <option value="originale">Originale del modello</option>
               </select>
             </label>
-            <p id="neuralMsg" class="neural-msg" aria-live="polite"></p>
+            <div id="saraPrep" class="sara-prep hidden">
+              <p id="saraPrepInfo" class="neural-msg"></p>
+              <div class="sara-row">
+                <select id="saraPages" aria-label="Quante pagine preparare">
+                  <option value="3">3 pagine</option>
+                  <option value="10" selected>10 pagine</option>
+                  <option value="30">30 pagine</option>
+                  <option value="100">100 pagine</option>
+                </select>
+                <button id="saraPrepBtn" class="btn btn-primary" type="button">Prepara in anticipo</button>
+              </div>
+            </div>
           </div>
           <div class="field">
             <label for="voiceSelect">Voce</label>

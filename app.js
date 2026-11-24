@@ -24,10 +24,14 @@
     voiceSelect: $('voiceSelect'),
     voiceTip: $('voiceTip'),
     neuralBox: $('neuralBox'),
-    neuralBtn: $('neuralBtn'),
     neuralProg: $('neuralProg'),
     neuralMsg: $('neuralMsg'),
     neuralStyle: $('neuralStyle'),
+    paolaStyleRow: $('paolaStyleRow'),
+    saraPrep: $('saraPrep'),
+    saraPrepBtn: $('saraPrepBtn'),
+    saraPrepInfo: $('saraPrepInfo'),
+    saraPages: $('saraPages'),
     rateInput: $('rateInput'),
     rateValue: $('rateValue'),
     fontInput: $('fontInput'),
@@ -386,9 +390,10 @@
     return 'Le voci più naturali sono in Microsoft Edge (voci «Online (Natural)», es. Isabella o Diego) e in Chrome («Google italiano»).';
   }
 
-  const Neural = window.NeuralTTS;
-  const neuralOk = !!(Neural && Neural.available());
-  const isNeural = () => neuralOk && el.voiceSelect.value === Neural.id;
+  const NV = window.NeuralVoices;
+  const neuralOk = !!(NV && NV.available());
+  const activeNeural = () => (neuralOk ? NV.get(el.voiceSelect.value) : null);
+  const isNeural = () => !!activeNeural();
 
   function loadVoices() {
     const all = synth ? synth.getVoices() : [];
@@ -417,11 +422,13 @@
     };
     if (neuralOk) {
       const g = document.createElement('optgroup');
-      g.label = 'Voce naturale (neurale, funziona offline)';
-      const o = document.createElement('option');
-      o.value = Neural.id;
-      o.textContent = '✨ Paola — la più naturale';
-      g.appendChild(o);
+      g.label = 'Voci naturali (funzionano offline)';
+      [['neural:paola', '✨ Paola — calma e scorrevole'], ['neural:sara', '✨ Sara — la più espressiva']].forEach(([id, label]) => {
+        const o = document.createElement('option');
+        o.value = id;
+        o.textContent = label;
+        g.appendChild(o);
+      });
       el.voiceSelect.appendChild(g);
     }
     addGroup('Voci italiane del telefono (le migliori in alto)', it);
@@ -430,48 +437,177 @@
     // Scelta automatica: la voce italiana di qualità più alta, se non ne hai scelta una tu.
     let chosen = state.voices.find((v) => (v.voiceURI || v.name) === saved);
     if (!chosen) chosen = it[0] || all.find((v) => v.default) || all[0];
-    if (neuralOk && (saved === Neural.id || (!saved && !it.length))) el.voiceSelect.value = Neural.id;
+    if (neuralOk && NV.get(saved)) el.voiceSelect.value = saved;
+    else if (neuralOk && !saved && !it.length) el.voiceSelect.value = 'neural:paola';
     else if (chosen) el.voiceSelect.value = chosen.voiceURI || chosen.name;
 
     const bestTag = it.length ? info.get(it[0]).tag : '';
-    el.voiceTip.textContent = bestTag ? '' : voiceTip() + (neuralOk ? ' Oppure usa la voce naturale Paola qui sopra.' : '');
+    el.voiceTip.textContent = bestTag ? '' : voiceTip() + (neuralOk ? ' Oppure usa una voce naturale qui sopra (Paola o Sara).' : '');
     el.voiceTip.classList.toggle('hidden', !!bestTag || isNeural());
     updateNeuralUi();
 
     if (!it.length && !neuralOk) setStatus('Nessuna voce italiana installata: apri ⚙️ Voce per sapere come aggiungerla.');
   }
 
-  // ---------- Voce naturale (Paola) ----------
+  // ---------- Voci naturali (Paola e Sara) ----------
+  const downloaded = {};
+  let prep = null;            // preparazione in anticipo di Sara: { texts, active }
+  let upcomingTexts = [];     // prossime frasi da leggere (per sapere quanto audio è pronto)
+
+  function fmtMin(sec) {
+    if (sec < 60) return Math.max(1, Math.round(sec)) + ' s';
+    return Math.round(sec / 60) + ' min';
+  }
+
   function updateNeuralUi() {
     if (!el.neuralBox) return;
     el.neuralBox.classList.toggle('hidden', !neuralOk);
     if (!neuralOk) { el.btnSettings.textContent = '⚙️ Voce'; return; }
-    const st = Neural.state;
-    const active = isNeural();
-    el.neuralProg.classList.toggle('hidden', st !== 'loading');
-    el.neuralProg.value = Math.round(Neural.progress * 100);
+    const act = activeNeural();
+    el.neuralBox.querySelectorAll('.nv').forEach((row) => {
+      const v = NV.get(row.dataset.voice);
+      const btn = row.querySelector('.nv-btn');
+      const on = act === v;
+      row.classList.toggle('on', on);
+      let t;
+      if (on && v.state === 'loading') t = Math.round(v.progress * 100) + '%';
+      else if (on && v.state === 'error') t = 'Riprova';
+      else if (on && (v.state === 'ready' || downloaded[v.id])) t = 'In uso ✓';
+      else t = downloaded[v.id] ? 'Usa' : 'Scarica · ' + v.sizeMB + ' MB';
+      btn.textContent = t;
+      btn.disabled = on && t !== 'Riprova' && !/^Scarica/.test(t);
+    });
     let msg = '';
-    let btn = '';
-    if (st === 'loading') msg = Neural.preparing ? 'Preparo la voce…' : 'Scarico la voce: ' + Math.round(Neural.progress * 100) + '% di ' + Neural.sizeMB + ' MB';
-    else if (st === 'error') { msg = 'Non è stato possibile avviare la voce naturale: ' + Neural.error; btn = 'Riprova'; }
-    else if (active && st === 'ready') msg = 'Voce naturale attiva ✓ Funziona anche senza internet.';
-    else if (active) msg = 'Selezionata: si avvia quando premi Leggi.';
-    else btn = neuralDownloaded ? 'Usa Paola' : 'Scarica e usa Paola (' + Neural.sizeMB + ' MB)';
-    el.neuralStyle.closest('label').classList.toggle('hidden', !active);
+    if (act) {
+      if (act.state === 'loading') msg = act.preparing ? 'Preparo la voce ' + act.name + '…' : 'Scarico ' + act.name + ': ' + Math.round(act.progress * 100) + '% di ' + act.sizeMB + ' MB (una volta sola).';
+      else if (act.state === 'error') msg = act.name + ' non si è avviata su questo dispositivo: ' + act.error;
+      else if (act.state === 'ready' && !act.slow) msg = act.name + ' è attiva ✓ Funziona anche senza internet.';
+      else if (act.state === 'ready') {
+        const ready = act.readySeconds(upcomingTexts);
+        msg = 'Sara è attiva ✓ Audio già pronto davanti a te: ' + (ready ? fmtMin(ready) : 'ancora niente') + '.';
+      } else msg = act.name + ' si avvia quando premi Leggi.';
+    }
+    el.neuralProg.classList.toggle('hidden', !(act && act.state === 'loading'));
+    el.neuralProg.value = act ? Math.round(act.progress * 100) : 0;
     el.neuralMsg.textContent = msg;
-    el.neuralBtn.textContent = btn;
-    el.neuralBtn.classList.toggle('hidden', !btn);
-    el.btnSettings.textContent = active ? '⚙️ Voce' : '⚙️ Voce ✨';
-    if (state.mode === 'playing' && isNeural() && st === 'loading') setStatus(msg);
+    el.paolaStyleRow.classList.toggle('hidden', !(act && act.styles));
+    el.saraPrep.classList.toggle('hidden', !(act && act.slow && act.state !== 'error'));
+    if (act && act.slow) updatePrepUi(act);
+    el.btnSettings.textContent = act ? '⚙️ Voce' : '⚙️ Voce ✨';
+    if (state.mode === 'playing' && act && act.state === 'loading') setStatus(msg);
   }
 
-  let neuralDownloaded = false;
-  function useNeural() {
-    el.voiceSelect.value = Neural.id;
-    store.set('voice', Neural.id);
-    el.voiceTip.classList.add('hidden');
-    Neural.load().catch(() => {});
+  function updatePrepUi(v) {
+    if (!prep || !prep.active) {
+      el.saraPrepBtn.textContent = 'Prepara in anticipo';
+      el.saraPrepInfo.textContent = 'Sara è più lenta a generare la voce: preparare qualche pagina prima di ascoltare evita le pause.';
+      return;
+    }
+    const done = prep.texts.filter((t) => v.isReady(t)).length;
+    const left = prep.texts.filter((t) => !v.isReady(t)).reduce((a, t) => a + t.length, 0);
+    el.saraPrepBtn.textContent = 'Interrompi';
+    if (done >= prep.texts.length) {
+      prep.active = false;
+      el.saraPrepBtn.textContent = 'Prepara in anticipo';
+      el.saraPrepInfo.textContent = 'Fatto ✓ ' + prep.pages + (prep.pages === 1 ? ' pagina pronta.' : ' pagine pronte.');
+      if (state.mode !== 'playing') releaseWakeLock();
+      return;
+    }
+    const eta = v.msPerChar ? ' · circa ' + fmtMin(left * v.msPerChar / 1000) + ' rimasti' : '';
+    el.saraPrepInfo.textContent = 'Preparo: ' + done + ' di ' + prep.texts.length + ' frasi' + eta + '. Tieni l\'app aperta.';
+  }
+
+  // Testi delle prossime frasi, a partire da quella corrente (anche nelle pagine successive).
+  async function upcoming(maxSentences, maxPages) {
+    const out = [];
+    let page = state.page;
+    let list = state.sentences.slice(state.sentence);
+    let pages = 1;
+    for (;;) {
+      for (const s of list) { out.push(speechText(s)); if (out.length >= maxSentences) return out; }
+      const np = nextReadablePage(page);
+      if (!np || pages >= maxPages) return out;
+      page = np;
+      pages++;
+      list = await getPageText(np);
+    }
+  }
+
+  async function feedQueue(v) {
+    const ahead = await upcoming(60, 6);
+    upcomingTexts = ahead;
+    const texts = prep && prep.active ? ahead.concat(prep.texts.filter((t) => !ahead.includes(t))) : ahead;
+    v.setQueue(texts);
+  }
+
+  async function togglePrepare() {
+    const v = activeNeural();
+    if (!v || !v.slow || !state.pdf) return;
+    if (prep && prep.active) {
+      prep.active = false;
+      v.setQueue(state.mode === 'playing' ? upcomingTexts : []);
+      if (state.mode !== 'playing') releaseWakeLock();
+      updateNeuralUi();
+      return;
+    }
+    const pages = parseInt(el.saraPages.value, 10) || 10;
+    const texts = await upcoming(100000, pages);
+    upcomingTexts = texts.slice(0, 60);
+    prep = { texts, pages, active: true };
+    requestWakeLock();
+    v.load().catch(() => {});
+    v.setQueue(state.mode === 'playing' ? upcomingTexts.concat(texts.filter((t) => !upcomingTexts.includes(t))) : texts);
     updateNeuralUi();
+  }
+
+  function useVoice(id) {
+    const v = NV.get(id);
+    el.voiceSelect.value = id;
+    store.set('voice', id);
+    el.voiceTip.classList.add('hidden');
+    NV.list.forEach((o) => { if (o !== v && o.state !== 'idle') o.release(); }); // libera la memoria dell'altra voce
+    prep = null;
+    v.load().then(() => { downloaded[id] = true; }).catch(() => {});
+    if (v.slow && state.pdf) upcoming(60, 6).then((t) => { upcomingTexts = t; v.setQueue(t); updateNeuralUi(); });
+    updateNeuralUi();
+  }
+
+  // Testo da pronunciare: abbreviazioni e simboli letti per esteso (il testo mostrato non cambia).
+  const ROMAN = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+  function roman(r) {
+    let n = 0;
+    for (let i = 0; i < r.length; i++) {
+      const a = ROMAN[r[i]], b = ROMAN[r[i + 1]] || 0;
+      n += a < b ? -a : a;
+    }
+    return n;
+  }
+  const ABBR = [
+    [/\bpagg\.\s*/gi, 'pagine '], [/\bpag\.\s*/gi, 'pagina '], [/\bpp\.\s*(?=\d)/g, 'pagine '], [/\bp\.\s*(?=\d)/g, 'pagina '],
+    [/\bcap\.\s*/gi, 'capitolo '], [/\bcapp\.\s*/gi, 'capitoli '], [/\bvol\.\s*/gi, 'volume '], [/\bfig\.\s*/gi, 'figura '],
+    [/\becc\.(?=\s+[A-ZÀ-Ý«"“]|\s*$)/g, 'eccetera.'], [/\becc\.(?=\s|$)/gi, 'eccetera'], [/\betc\.(?=\s|$)/gi, 'eccetera'], [/\bp\.\s?es\./gi, 'per esempio'], [/\bad es\./gi, 'ad esempio'],
+    [/\bes\.\s/gi, 'esempio '], [/\bcfr\.\s*/gi, 'confronta '], [/\bdott\.ssa\b/gi, 'dottoressa'], [/\bdott\.\s*/gi, 'dottor '],
+    [/\bsig\.ra\b/gi, 'signora'], [/\bsigg\.\s*/gi, 'signori '], [/\bsig\.\s*/gi, 'signor '], [/\bprof\.ssa\b/gi, 'professoressa'],
+    [/\bprof\.\s*/gi, 'professor '], [/\bavv\.\s*/gi, 'avvocato '], [/\bing\.\s*/gi, 'ingegner '], [/\bgeom\.\s*/gi, 'geometra '],
+    [/\bn\.\s*(?=\d)/gi, 'numero '], [/\bnr\.\s*(?=\d)/gi, 'numero '], [/\btel\.\s*/gi, 'telefono '], [/\bart\.\s*(?=\d)/gi, 'articolo '],
+    [/\ba\.\s?C\./g, 'avanti Cristo'], [/\bd\.\s?C\./g, 'dopo Cristo'], [/\bS\.\s?p\.\s?A\./g, 'Società per azioni'],
+  ];
+  function speechText(s) {
+    let t = s;
+    for (const [re, rep] of ABBR) t = t.replace(re, rep);
+    t = t
+      .replace(/\.{3,}/g, '…')
+      .replace(/(\d)\s?%/g, '$1 percento')
+      .replace(/€\s?(\d[\d.,]*)/g, '$1 euro').replace(/(\d)\s?€/g, '$1 euro')
+      .replace(/(\d)\s?°\s?C\b/g, '$1 gradi').replace(/(\d)\s?°/g, '$1 gradi')
+      .replace(/\s&\s/g, ' e ')
+      .replace(/§\s?/g, 'paragrafo ')
+      .replace(/\b(capitolo|parte|libro|atto|scena|volume|tomo|canto|sezione)\s+([IVXLCDM]{1,7})\b/gi, (m, w, r) => w + ' ' + roman(r.toUpperCase()))
+      .replace(/^\s*([IVXLC]{1,6})\s*[.)]?\s*$/, (m, r) => 'Capitolo ' + roman(r))
+      .replace(/[_*#~|<>{}\[\]]+/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    return t;
   }
 
   function currentVoice() {
@@ -508,9 +644,9 @@
     highlight(true);
     savePosition();
 
-    if (isNeural()) { speakNeural(myToken); return; }
+    if (isNeural()) { speakNeural(activeNeural(), myToken); return; }
 
-    const u = new SpeechSynthesisUtterance(state.sentences[state.sentence]);
+    const u = new SpeechSynthesisUtterance(speechText(state.sentences[state.sentence]));
     const voice = currentVoice();
     if (voice) { u.voice = voice; u.lang = voice.lang; } else { u.lang = 'it-IT'; }
     u.rate = parseFloat(el.rateInput.value) || 1;
@@ -536,15 +672,20 @@
     synth.speak(u);
   }
 
-  function speakNeural(myToken) {
+  function speakNeural(v, myToken) {
     const rate = parseFloat(el.rateInput.value) || 1;
-    const text = state.sentences[state.sentence];
-    if (Neural.state !== 'ready') {
-      setStatus('Preparo la voce naturale…');
-      Neural.load().then(() => { if (myToken === state.token && state.mode === 'playing') updateButtons(); }).catch(() => {});
+    const text = speechText(state.sentences[state.sentence]);
+    if (v.state !== 'ready') {
+      setStatus(v.state === 'loading' ? 'Preparo la voce ' + v.name + '…' : 'Avvio la voce ' + v.name + '…');
+      v.load().catch(() => {});
     }
-    Neural.speak(text, rate).then(() => {
-      if (myToken !== state.token || state.mode !== 'playing') return;
+    if (v.slow) feedQueue(v).then(updateNeuralUi);
+    const ok = () => myToken === state.token && state.mode === 'playing';
+    v.speak(text, rate,
+      () => { if (ok() && v.state === 'ready') setStatus(v.slow ? 'Sara sta preparando la frase… (con «Prepara in anticipo» eviti queste attese)' : 'Preparo la frase…'); },
+      () => { if (ok()) updateButtons(); },
+    ).then(() => {
+      if (!ok()) return;
       state.errors = 0;
       state.sentence++;
       speakCurrent();
@@ -552,33 +693,35 @@
       if (myToken !== state.token || (err && err.canceled)) return;
       console.warn('Voce naturale:', err);
       if (err && err.name === 'NotAllowedError') { pause(); setStatus('Premi Riprendi per continuare'); return; }
-      if (Neural.state === 'error' || ++state.errors >= 3) {
+      if (v.state === 'error' || ++state.errors >= 3) {
         pause();
-        setStatus('La voce naturale non funziona su questo dispositivo: scegli un\'altra voce in ⚙️ Voce.');
+        setStatus(v.name + ' non funziona su questo dispositivo: scegli un\'altra voce in ⚙️ Voce.');
         return;
       }
       state.sentence++;
       setTimeout(speakCurrent, 50);
     });
-    // Prepara in anticipo la frase successiva (anche della pagina dopo), così non ci sono pause.
-    const nextText = state.sentences[state.sentence + 1];
-    if (nextText) Neural.prefetch(nextText, rate);
-    else {
-      const np = nextReadablePage(state.page);
-      if (np) getPageText(np).then((ss) => { if (ss[0]) Neural.prefetch(ss[0], rate); }).catch(() => {});
+    if (!v.slow) {
+      // Prepara la frase successiva (anche della pagina dopo), così non ci sono pause.
+      const nextText = state.sentences[state.sentence + 1];
+      if (nextText) v.prefetch(speechText(nextText), rate);
+      else {
+        const np = nextReadablePage(state.page);
+        if (np) getPageText(np).then((ss) => { if (ss[0]) v.prefetch(speechText(ss[0]), rate); }).catch(() => {});
+      }
     }
   }
 
   function cancelSpeech() {
     state.token++;
     if (synth) synth.cancel();
-    if (neuralOk) Neural.stop();
+    if (neuralOk) NV.stopAll();
   }
 
   function play() {
     if (!synth && !isNeural()) { alert('Questo browser non supporta la sintesi vocale.'); return; }
     if (!state.pdf) return;
-    if (isNeural()) Neural.unlock(); // va fatto subito, dentro il tocco
+    if (isNeural()) NV.unlock(); // va fatto subito, dentro il tocco
     cancelSpeech();
     state.errors = 0;
     state.mode = 'playing';
@@ -649,6 +792,7 @@
     state, el, events, store, idb, edits: emptyEdits(), emptyEdits,
     play, pause, resume, stop, togglePlay, goToPage, showView,
     saveEdits, showLoading, hideLoading, toast, loadScript,
+    speechText,
   };
 
   // ---------- Eventi ----------
@@ -685,22 +829,44 @@
 
   el.voiceSelect.addEventListener('change', () => {
     store.set('voice', el.voiceSelect.value);
-    if (isNeural()) useNeural();
-    else { updateNeuralUi(); el.voiceTip.classList.toggle('hidden', !el.voiceTip.textContent); }
+    if (isNeural()) useVoice(el.voiceSelect.value);
+    else {
+      NV && NV.list.forEach((o) => { if (o.state !== 'idle') o.release(); });
+      updateNeuralUi();
+      el.voiceTip.classList.toggle('hidden', !el.voiceTip.textContent);
+    }
     if (state.mode === 'playing') play(); // riparte la frase con la nuova voce
   });
   if (neuralOk) {
-    el.neuralBtn.addEventListener('click', () => { Neural.unlock(); useNeural(); });
-    el.neuralStyle.value = Neural.style;
-    el.neuralStyle.addEventListener('change', () => {
-      Neural.setStyle(el.neuralStyle.value);
-      if (state.mode === 'playing') play(); // riparte la frase con il nuovo stile
+    el.neuralBox.querySelectorAll('.nv').forEach((row) => {
+      row.querySelector('.nv-btn').addEventListener('click', () => {
+        NV.unlock();
+        const v = NV.get(row.dataset.voice);
+        if (v.state === 'error') v.state = 'idle';
+        useVoice(v.id);
+        if (state.mode === 'playing') play();
+      });
     });
-    Neural.onChange(updateNeuralUi);
-    Neural.isDownloaded().then((ok) => {
-      neuralDownloaded = ok;
-      updateNeuralUi();
-      if (ok && isNeural()) Neural.load().catch(() => {}); // prepara subito la voce già scaricata
+    const paola = NV.get('neural:paola');
+    el.neuralStyle.value = paola.style;
+    el.neuralStyle.addEventListener('change', () => {
+      paola.setStyle(el.neuralStyle.value);
+      if (state.mode === 'playing' && activeNeural() === paola) play(); // riparte con il nuovo stile
+    });
+    el.saraPrepBtn.addEventListener('click', togglePrepare);
+    let uiRaf = false;
+    NV.list.forEach((v) => {
+      v.onChange(() => {
+        if (uiRaf) return;
+        uiRaf = true;
+        requestAnimationFrame(() => { uiRaf = false; updateNeuralUi(); });
+      });
+      v.isDownloaded().then((ok) => {
+        downloaded[v.id] = ok;
+        if (activeNeural() !== v) v.release(); // il controllo ha avviato un worker: lo chiudiamo
+        updateNeuralUi();
+        if (ok && activeNeural() === v) v.load().catch(() => {}); // prepara subito la voce già scaricata
+      });
     });
   }
 

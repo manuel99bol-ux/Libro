@@ -13,11 +13,13 @@ Si può installare sulla schermata Home e funziona anche offline.
 - La frase in lettura viene evidenziata; toccando una frase la lettura parte da lì.
 - Il punto raggiunto viene salvato e alla riapertura l'ultimo libro riparte da lì.
 
-**✨ Voce naturale «Paola»** (in 🎧 Ascolta → ⚙️ Voce)
-- Voce italiana neurale (Piper), molto meno robotica delle voci di base del telefono.
-- Funziona direttamente sul telefono, senza server; si scarica una volta (circa 65 MB) e poi va anche offline.
-- Ogni frase viene generata mentre si ascolta la precedente, quindi non ci sono pause.
-- Sui telefoni più vecchi la prima frase può richiedere qualche secondo.
+**✨ Voci naturali** (in 🎧 Ascolta → ⚙️ Voce), funzionano sul telefono, senza server e anche offline
+- **Paola**: calma e scorrevole, legge subito. Stili: Calma (predefinito), Naturale, Espressiva, Originale. Circa 65 MB.
+- **Sara**: la più espressiva, ma più lenta a generare la voce. L'app prepara l'audio delle frasi successive
+  mentre ascolti e lo conserva sul telefono. Con **«Prepara in anticipo»** (3–100 pagine) lo prepari prima:
+  lascia l'app aperta, meglio in carica. Circa 95 MB.
+- Le abbreviazioni (pag., cap., ecc., dott.…), i simboli (%, €, °) e i numeri romani dei capitoli vengono letti per esteso.
+- L'audio preparato occupa al massimo circa 350 MB: quello più vecchio viene cancellato da solo.
 
 **📄 Pagine**
 - Il PDF completo, pagina per pagina, così com'è (immagini comprese).
@@ -75,6 +77,6 @@ Fai doppio clic su `index.html`. Oppure, in un terminale nella cartella:
 - Nei testi aggiunti si possono usare lettere accentate e la punteggiatura comune; simboli speciali
   ed emoji diventano «?» nel PDF salvato.
 
-Voce naturale: modello Piper «it_IT-paola-medium» (dataset CC0), onnxruntime-web (MIT) ed espeak-ng (GPL-3.0); dettagli in `lib/piper/NOTICE.txt`.
+Voci naturali: Piper «it_IT-paola-medium» (dataset CC0), Kokoro-82M (Apache-2.0), onnxruntime-web (MIT) ed espeak-ng (GPL-3.0); dettagli in `lib/piper/NOTICE.txt`.
 
 Librerie incluse in `lib/`: [pdf.js](https://mozilla.github.io/pdf.js/) (Apache 2.0) e [pdf-lib](https://pdf-lib.js.org/) (MIT).
