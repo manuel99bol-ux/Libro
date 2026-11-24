@@ -21,6 +21,16 @@ Si può installare sulla schermata Home e funziona anche offline.
 - Le abbreviazioni (pag., cap., ecc., dott.…), i simboli (%, €, °) e i numeri romani dei capitoli vengono letti per esteso.
 - L'audio preparato occupa al massimo circa 350 MB: quello più vecchio viene cancellato da solo.
 
+**☁️ Voce premium (Microsoft Azure)** (in 🎧 Ascolta → ⚙️ Voce), le voci più naturali; serve internet
+- Usa una chiave **gratuita** di Azure (piano F0): al limite mensile il servizio si ferma, senza addebiti.
+- Come ottenerla: portal.azure.com → crea un account → cerca «Servizi di riconoscimento vocale» (Speech services)
+  → Crea → piano **Free F0**, area West Europe → «Chiavi ed endpoint»: copia KEY 1 e la Location/Region.
+- Incolla chiave e area nell'app e premi «Collega Azure»; scegli la voce (Isabella, Elsa, Diego…) e «Usa questa voce».
+- La chiave resta solo sul dispositivo. L'app chiama Azure direttamente dal browser, senza server intermedi.
+- Le frasi già ascoltate restano sul telefono e non consumano di nuovo la quota. Se la quota finisce o la chiave
+  non è più valida, l'app passa da sola a Paola (se scaricata) o alla voce del telefono.
+- Il testo letto viene inviato a Microsoft per generare l'audio.
+
 **📄 Pagine**
 - Il PDF completo, pagina per pagina, così com'è (immagini comprese).
 - Zoom con ➖ ➕ o col pizzico a due dita.

@@ -1,6 +1,6 @@
 /* Service worker: rende l'app disponibile anche senza connessione e abilita
    l'"isolamento" della pagina, che permette alle voci naturali di usare più core. */
-const CACHE = 'libro-v7';
+const CACHE = 'libro-v8';
 const FILES = [
   './',
   'index.html',

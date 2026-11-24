@@ -424,6 +424,18 @@ body.view-pages .hero-art .sparks { display: none; }
   background: var(--card); color: var(--text); max-width: 100%;
 }
 .neural-msg:empty { display: none; }
+.azure-box { background: linear-gradient(180deg, rgba(18, 194, 126, 0.12), var(--card) 70%); }
+.az-input {
+  font: inherit; font-weight: 500; padding: 11px 12px; border-radius: 12px; border: 1.5px solid var(--border);
+  background: var(--card); color: var(--text); width: 100%;
+}
+.az-wide { width: 100%; flex-direction: row; min-height: 50px; margin-top: 12px; font-size: 1rem; border-radius: 14px; }
+.az-help { margin-top: 12px; font-size: 0.9rem; font-weight: 500; }
+.az-help summary { cursor: pointer; font-weight: 700; color: var(--primary); padding: 6px 0; }
+.az-help ol { padding-left: 1.3em; margin: 6px 0; line-height: 1.5; }
+.az-help li { margin-bottom: 6px; }
+.az-help p { color: var(--muted); margin: 6px 0 0; }
+.az-link { display: block; margin: 12px auto 0; border: none; background: none; color: var(--muted); text-decoration: underline; font-size: 0.85rem; cursor: pointer; }
 .voice-tip {
   margin: 4px 0 0;
   padding: 10px 12px;

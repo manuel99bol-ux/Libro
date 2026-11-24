@@ -32,6 +32,17 @@
     saraPrepBtn: $('saraPrepBtn'),
     saraPrepInfo: $('saraPrepInfo'),
     saraPages: $('saraPages'),
+    azureBox: $('azureBox'),
+    azForm: $('azForm'),
+    azConnected: $('azConnected'),
+    azKey: $('azKey'),
+    azRegion: $('azRegion'),
+    azConnect: $('azConnect'),
+    azVoice: $('azVoice'),
+    azTry: $('azTry'),
+    azUse: $('azUse'),
+    azDisconnect: $('azDisconnect'),
+    azMsg: $('azMsg'),
     rateInput: $('rateInput'),
     rateValue: $('rateValue'),
     fontInput: $('fontInput'),
@@ -457,13 +468,24 @@
       });
       el.voiceSelect.appendChild(g);
     }
+    if (neuralOk && NV.azure.configured()) {
+      const g = document.createElement('optgroup');
+      g.label = 'Voce premium Azure (serve internet)';
+      NV.azure.voices().forEach((v) => {
+        const o = document.createElement('option');
+        o.value = 'azure:' + v.name;
+        o.textContent = '☁️ ' + v.label + ' — Azure';
+        g.appendChild(o);
+      });
+      el.voiceSelect.appendChild(g);
+    }
     addGroup('Voci italiane del telefono (le migliori in alto)', it);
     addGroup('Altre lingue', others);
 
     // Scelta automatica: la voce italiana di qualità più alta, se non ne hai scelta una tu.
     let chosen = state.voices.find((v) => (v.voiceURI || v.name) === saved);
     if (!chosen) chosen = it[0] || all.find((v) => v.default) || all[0];
-    if (neuralOk && NV.get(saved)) el.voiceSelect.value = saved;
+    if (neuralOk && saved && [...el.voiceSelect.options].some((o) => o.value === saved) && NV.get(saved)) el.voiceSelect.value = saved;
     else if (neuralOk && !saved && !it.length) el.voiceSelect.value = 'neural:paola';
     else if (chosen) el.voiceSelect.value = chosen.voiceURI || chosen.name;
 
@@ -506,7 +528,8 @@
     let msg = '';
     if (act) {
       if (act.state === 'loading') msg = act.preparing ? 'Preparo la voce ' + act.name + '…' : 'Scarico ' + act.name + ': ' + Math.round(act.progress * 100) + '% di ' + act.sizeMB + ' MB (una volta sola).';
-      else if (act.state === 'error') msg = act.name + ' non si è avviata su questo dispositivo: ' + act.error;
+      else if (act.state === 'error' && !act.cloud) msg = act.name + ' non si è avviata su questo dispositivo: ' + act.error;
+      else if (act.cloud) msg = '';
       else if (act.state === 'ready' && !act.slow) msg = act.name + ' è attiva ✓ Funziona anche senza internet.';
       else if (act.state === 'ready') {
         const ready = act.readySeconds(upcomingTexts);
@@ -517,8 +540,9 @@
     el.neuralProg.value = act ? Math.round(act.progress * 100) : 0;
     el.neuralMsg.textContent = msg;
     el.paolaStyleRow.classList.toggle('hidden', !(act && act.styles));
-    el.saraPrep.classList.toggle('hidden', !(act && act.slow && act.state !== 'error'));
-    if (act && act.slow) updatePrepUi(act);
+    el.saraPrep.classList.toggle('hidden', !(act && act.slow && !act.cloud && act.state !== 'error'));
+    if (act && act.slow && !act.cloud) updatePrepUi(act);
+    updateAzureUi();
     el.btnSettings.classList.toggle('has-tip', !act); // pallino: c'è una voce più naturale da provare
     if (state.mode === 'playing' && act && act.state === 'loading') setStatus(msg);
   }
@@ -586,6 +610,44 @@
     v.load().catch(() => {});
     v.setQueue(state.mode === 'playing' ? upcomingTexts.concat(texts.filter((t) => !upcomingTexts.includes(t))) : texts);
     updateNeuralUi();
+  }
+
+  // Voce di riserva quando Azure non è disponibile: Paola se è scaricata, altrimenti la migliore del telefono.
+  function fallbackVoice() {
+    if (neuralOk && downloaded['neural:paola']) return 'neural:paola';
+    const opt = [...el.voiceSelect.options].find((o) => !o.value.startsWith('azure:') && !o.value.startsWith('neural:'));
+    return opt ? opt.value : 'neural:paola';
+  }
+
+  function updateAzureUi() {
+    if (!el.azureBox) return;
+    const az = NV.azure;
+    el.azureBox.classList.toggle('hidden', !neuralOk);
+    const on = az.configured();
+    el.azForm.classList.toggle('hidden', on);
+    el.azConnected.classList.toggle('hidden', !on);
+    if (on) {
+      const cur = el.azVoice.value;
+      el.azVoice.innerHTML = '';
+      az.voices().forEach((v) => {
+        const o = document.createElement('option');
+        o.value = v.name;
+        o.textContent = v.label + (v.gender === 'Male' ? ' · voce maschile' : v.gender === 'Female' ? ' · voce femminile' : '');
+        el.azVoice.appendChild(o);
+      });
+      el.azVoice.value = cur && az.voices().some((v) => v.name === cur) ? cur : az.settings.voice;
+      const active = activeNeural() === az;
+      el.azUse.textContent = active && el.voiceSelect.value === 'azure:' + el.azVoice.value ? 'In uso ✓' : 'Usa questa voce';
+      if (!el.azMsg.dataset.sticky) {
+        el.azMsg.textContent = active ? 'Voce premium attiva ✓ Le frasi già ascoltate restano sul telefono e non consumano di nuovo la quota.' : 'Azure è collegato ✓';
+      }
+    } else if (az.state === 'error') {
+      el.azMsg.textContent = az.error;
+    } else if (az.state === 'loading') {
+      el.azMsg.textContent = 'Controllo la chiave…';
+    } else if (!el.azMsg.dataset.sticky) {
+      el.azMsg.textContent = '';
+    }
   }
 
   function useVoice(id) {
@@ -710,7 +772,7 @@
     if (v.slow) feedQueue(v).then(updateNeuralUi);
     const ok = () => myToken === state.token && state.mode === 'playing';
     v.speak(text, rate,
-      () => { if (ok() && v.state === 'ready') setStatus(v.slow ? 'Sara sta preparando la frase… (con «Prepara in anticipo» eviti queste attese)' : 'Preparo la frase…'); },
+      () => { if (ok() && v.state === 'ready') setStatus(v.cloud ? 'Scarico la voce da Azure…' : v.slow ? 'Sara sta preparando la frase… (con «Prepara in anticipo» eviti queste attese)' : 'Preparo la frase…'); },
       () => { if (ok()) updateButtons(); },
     ).then(() => {
       if (!ok()) return;
@@ -721,6 +783,16 @@
       if (myToken !== state.token || (err && err.canceled)) return;
       console.warn('Voce naturale:', err);
       if (err && err.name === 'NotAllowedError') { pause(); setStatus('Premi Riprendi per continuare'); return; }
+      if (v.cloud && err && err.fallback) {
+        // Quota gratuita finita o chiave non valida: si continua con un'altra voce, senza costi.
+        const fb = fallbackVoice();
+        el.voiceSelect.value = fb;
+        el.voiceSelect.dispatchEvent(new Event('change'));
+        toast(err.message + ' Continuo con un\'altra voce.', 5000);
+        if (state.mode !== 'playing') play();
+        return;
+      }
+      if (v.cloud && err && err.status === 0) { pause(); setStatus(err.message); return; }
       if (v.state === 'error' || ++state.errors >= 3) {
         pause();
         setStatus(v.name + ' non funziona su questo dispositivo: scegli un\'altra voce in ⚙️ Voce.');
@@ -896,6 +968,58 @@
         b.textContent = '■ Stop';
       });
     });
+    // --- Azure
+    const az = NV.azure;
+    el.azRegion.value = az.settings.region;
+    el.azConnect.addEventListener('click', async () => {
+      const key = el.azKey.value.trim();
+      if (!key) { el.azMsg.textContent = 'Incolla prima la chiave (KEY 1).'; return; }
+      el.azConnect.disabled = true;
+      try {
+        const list = await az.connect(key, el.azRegion.value);
+        el.azKey.value = '';
+        loadVoices();
+        updateNeuralUi();
+        el.azMsg.textContent = 'Collegato ✓ ' + list.length + (list.length === 1 ? ' voce italiana disponibile.' : ' voci italiane disponibili.') + ' Scegline una e premi «Usa questa voce».';
+      } catch (e) {
+        el.azMsg.textContent = e.message;
+      } finally {
+        el.azConnect.disabled = false;
+      }
+    });
+    el.azVoice.addEventListener('change', updateAzureUi);
+    el.azTry.addEventListener('click', async () => {
+      el.azTry.disabled = true;
+      el.azMsg.textContent = 'Preparo un esempio…';
+      try {
+        const url = await az.preview(el.azVoice.value, 'Ciao! Sono la voce che leggerà i tuoi libri. Spero che ti piaccia.');
+        if (state.mode === 'playing') pause();
+        demo.pause();
+        demo.src = url;
+        await demo.play();
+        el.azMsg.textContent = '';
+        updateAzureUi();
+      } catch (e) {
+        el.azMsg.textContent = e.message;
+      } finally {
+        el.azTry.disabled = false;
+      }
+    });
+    el.azUse.addEventListener('click', () => {
+      NV.unlock();
+      el.voiceSelect.value = 'azure:' + el.azVoice.value;
+      el.voiceSelect.dispatchEvent(new Event('change'));
+    });
+    el.azDisconnect.addEventListener('click', () => {
+      const wasActive = activeNeural() === az;
+      az.disconnect();
+      if (wasActive) { el.voiceSelect.value = fallbackVoice(); store.set('voice', el.voiceSelect.value); }
+      loadVoices();
+      updateNeuralUi();
+      el.azMsg.textContent = 'Azure scollegato: la chiave è stata cancellata da questo dispositivo.';
+    });
+    az.onChange(() => updateNeuralUi());
+
     const paola = NV.get('neural:paola');
     el.neuralStyle.value = paola.style;
     el.neuralStyle.addEventListener('change', () => {

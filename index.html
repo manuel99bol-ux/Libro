@@ -294,6 +294,53 @@
               </div>
             </div>
           </div>
+          <div id="azureBox" class="neural-box azure-box">
+            <div class="neural-head">☁️ <strong>Voce premium (Microsoft Azure)</strong></div>
+            <p class="neural-text">Le voci più naturali, simili a quelle degli assistenti AI. Servono internet e una chiave
+              <strong>gratuita</strong> di Azure (piano F0): se la quota gratuita del mese finisce, l'app passa da sola a un'altra voce, senza costi.</p>
+            <div id="azForm">
+              <label class="field" for="azKey">Chiave (KEY 1)
+                <input id="azKey" class="az-input" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Incolla qui la chiave">
+              </label>
+              <label class="field" for="azRegion">Area (Location / Region)
+                <select id="azRegion">
+                  <option value="westeurope">Europa occidentale (West Europe)</option>
+                  <option value="italynorth">Italia settentrionale (Italy North)</option>
+                  <option value="northeurope">Europa settentrionale (North Europe)</option>
+                  <option value="francecentral">Francia (France Central)</option>
+                  <option value="germanywestcentral">Germania (Germany West Central)</option>
+                  <option value="switzerlandnorth">Svizzera (Switzerland North)</option>
+                  <option value="swedencentral">Svezia (Sweden Central)</option>
+                  <option value="uksouth">Regno Unito (UK South)</option>
+                  <option value="eastus">Stati Uniti est (East US)</option>
+                  <option value="westus2">Stati Uniti ovest (West US 2)</option>
+                </select>
+              </label>
+              <button id="azConnect" class="btn btn-primary az-wide" type="button">Collega Azure</button>
+              <details class="az-help">
+                <summary>Come ottengo la chiave gratuita?</summary>
+                <ol>
+                  <li>Apri <strong>portal.azure.com</strong> e crea un account gratuito (la carta serve solo come verifica).</li>
+                  <li>In alto cerca <strong>«Servizi di riconoscimento vocale»</strong> (in inglese «Speech services») e premi <strong>Crea</strong>.</li>
+                  <li>Piano tariffario: scegli <strong>Free F0</strong>. Area: <strong>West Europe</strong> (o un'altra vicina). Nome: quello che vuoi.</li>
+                  <li>Finita la creazione, apri la risorsa e poi <strong>«Chiavi ed endpoint»</strong>: copia <strong>KEY 1</strong> e guarda la <strong>Location/Region</strong>.</li>
+                  <li>Incolla qui la chiave, scegli la stessa area e premi <strong>Collega Azure</strong>.</li>
+                </ol>
+                <p>Con il piano F0 non paghi mai: al limite mensile il servizio si ferma. La chiave resta solo su questo dispositivo.</p>
+              </details>
+            </div>
+            <div id="azConnected" class="hidden">
+              <label class="field" for="azVoice">Voce Azure
+                <select id="azVoice"></select>
+              </label>
+              <div class="sara-row">
+                <button id="azTry" class="btn" type="button">▶ Prova</button>
+                <button id="azUse" class="btn btn-primary" type="button">Usa questa voce</button>
+              </div>
+              <button id="azDisconnect" class="az-link" type="button">Scollega Azure da questo dispositivo</button>
+            </div>
+            <p id="azMsg" class="neural-msg" aria-live="polite"></p>
+          </div>
           <div class="field">
             <label for="voiceSelect">Voce</label>
             <select id="voiceSelect"></select>

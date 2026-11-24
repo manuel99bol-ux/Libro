@@ -416,9 +416,207 @@
     voice: { speed: 0.93, pause: 380 },
   });
 
+  // ---------- Voce premium: Microsoft Azure (servizio cloud, chiave dell'utente) ----------
+  // L'app parla direttamente con Azure dal browser (nessun server nostro).
+  // La chiave resta salvata solo su questo dispositivo.
+  const AZ_DEFAULT_VOICES = [
+    { name: 'it-IT-IsabellaNeural', label: 'Isabella', gender: 'Female' },
+    { name: 'it-IT-ElsaNeural', label: 'Elsa', gender: 'Female' },
+    { name: 'it-IT-DiegoNeural', label: 'Diego', gender: 'Male' },
+  ];
+  const xmlEsc = (s) => s.replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]));
+  function azError(status, fallback) {
+    const e = new Error(
+      status === 401 ? 'Chiave o area di Azure non valide.'
+        : status === 403 ? 'Azure ha rifiutato la richiesta: la quota gratuita del mese potrebbe essere finita.'
+          : status === 429 ? 'Troppe richieste o quota gratuita esaurita su Azure.'
+            : status === 0 ? 'Azure non è raggiungibile: controlla la connessione a internet.'
+              : 'Azure ha risposto con un errore (' + status + ').');
+    e.status = status;
+    e.fallback = fallback;
+    return e;
+  }
+
+  function createAzure() {
+    const E = {
+      id: 'azure',
+      cloud: true,
+      slow: true,           // audio conservato e velocità applicata in riproduzione
+      name: 'Azure',
+      sizeMB: 0,
+      state: 'idle',
+      error: '',
+      progress: 1,
+      listeners: new Set(),
+      inflight: new Map(),
+      want: [],
+      pumping: false,
+      msPerChar: 0,
+      settings: Object.assign({ key: '', region: 'westeurope', voice: 'it-IT-IsabellaNeural', voices: null }, store.get('azure', {})),
+
+      onChange(fn) { this.listeners.add(fn); },
+      emit() { this.listeners.forEach((fn) => { try { fn(this); } catch (e) { /* ignora */ } }); },
+      configured() { return !!this.settings.key; },
+      save() { store.set('azure', this.settings); },
+      voices() { return this.settings.voices && this.settings.voices.length ? this.settings.voices : AZ_DEFAULT_VOICES; },
+      voiceLabel(name) {
+        const v = this.voices().find((x) => x.name === name);
+        return v ? v.label : name.replace(/^it-IT-|Neural$/g, '');
+      },
+      host() { return 'https://' + this.settings.region + '.tts.speech.microsoft.com'; },
+
+      // Controlla chiave e area scaricando l'elenco delle voci italiane.
+      async connect(key, region) {
+        this.settings.key = key.trim();
+        this.settings.region = region;
+        this.state = 'loading';
+        this.error = '';
+        this.emit();
+        let res;
+        try {
+          res = await fetch(this.host() + '/cognitiveservices/voices/list', { headers: { 'Ocp-Apim-Subscription-Key': this.settings.key } });
+        } catch (e) {
+          this.settings.key = '';
+          this.state = 'error';
+          this.error = azError(0).message;
+          this.emit();
+          throw new Error(this.error);
+        }
+        if (!res.ok) {
+          this.settings.key = '';
+          this.state = 'error';
+          this.error = azError(res.status).message;
+          this.emit();
+          throw new Error(this.error);
+        }
+        const all = await res.json();
+        const it = all.filter((v) => v.Locale === 'it-IT')
+          .map((v) => ({
+            name: v.ShortName,
+            label: (v.LocalName || v.DisplayName || v.ShortName) + (/Multilingual/.test(v.ShortName) ? ' (multilingue)' : '') + (/HD/.test(v.ShortName) ? ' HD' : ''),
+            gender: v.Gender,
+          }))
+          .sort((a, b) => a.label.localeCompare(b.label));
+        this.settings.voices = it.length ? it : null;
+        if (!this.voices().some((v) => v.name === this.settings.voice)) this.settings.voice = this.voices()[0].name;
+        this.save();
+        this.state = 'ready';
+        this.emit();
+        return this.voices();
+      },
+      disconnect() {
+        this.settings.key = '';
+        this.save();
+        this.release();
+        this.state = 'idle';
+        this.emit();
+      },
+      setVoice(name) { if (name && name !== this.settings.voice) { this.settings.voice = name; this.save(); } },
+      load() {
+        if (!this.configured()) {
+          this.state = 'error';
+          this.error = 'Collega prima Azure in ⚙️ Voce.';
+          this.emit();
+          return Promise.reject(new Error(this.error));
+        }
+        if (this.state !== 'ready') { this.state = 'ready'; this.error = ''; this.emit(); }
+        return Promise.resolve();
+      },
+      release() { this.want = []; this.inflight.clear(); },
+
+      // Una richiesta a Azure; riprova da sola se il servizio chiede di rallentare.
+      async synthVoice(text, voice) {
+        const pause = Math.round(pauseFor(text, 260));
+        const ssml = '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="it-IT">' +
+          '<voice name="' + xmlEsc(voice) + '"><prosody rate="-4%">' + xmlEsc(text) + '</prosody>' +
+          '<break time="' + pause + 'ms"/></voice></speak>';
+        for (let attempt = 0; ; attempt++) {
+          const t0 = Date.now();
+          let res;
+          try {
+            res = await fetch(this.host() + '/cognitiveservices/v1', {
+              method: 'POST',
+              headers: {
+                'Ocp-Apim-Subscription-Key': this.settings.key,
+                'Content-Type': 'application/ssml+xml',
+                'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
+              },
+              body: ssml,
+            });
+          } catch (e) { throw azError(0, false); }
+          if (res.ok) {
+            const blob = await res.blob();
+            if (text.length) this.msPerChar = (Date.now() - t0) / text.length;
+            return { blob: new Blob([blob], { type: 'audio/mpeg' }), dur: text.length / 14 + pause / 1000 };
+          }
+          if (res.status === 429 && attempt < 2) { await new Promise((r) => setTimeout(r, 1500 * (attempt + 1))); continue; }
+          throw azError(res.status, res.status === 401 || res.status === 403 || res.status === 429);
+        }
+      },
+      keyOf(text) { return 'az-' + this.settings.voice.replace(/\W/g, '') + '-' + hash(text); },
+      clip(text) {
+        const key = this.keyOf(text);
+        if (this.inflight.has(key)) return this.inflight.get(key);
+        const voice = this.settings.voice;
+        const p = (async () => {
+          const have = await Clips.get(key);
+          if (have) return have;
+          const c = await this.synthVoice(text, voice);
+          return Clips.put(key, c.blob, c.dur);
+        })();
+        this.inflight.set(key, p);
+        p.then(() => this.inflight.delete(key), () => this.inflight.delete(key));
+        return p;
+      },
+      // Prova di una voce: non viene conservata.
+      async preview(voice, text) {
+        const c = await this.synthVoice(text, voice);
+        return URL.createObjectURL(c.blob);
+      },
+      isReady(text) { return Clips.has(this.keyOf(text)); },
+      readySeconds(texts) {
+        let s = 0;
+        for (const t of texts) { if (!this.isReady(t)) break; s += Clips.durOf(this.keyOf(t)); }
+        return s;
+      },
+      // Prepara solo le prossime frasi: così si consuma poca quota e si rispettano i limiti del piano gratuito.
+      setQueue(texts) { this.want = texts.filter(Boolean).slice(0, 3); this.pump(); },
+      async pump() {
+        if (this.pumping) return;
+        this.pumping = true;
+        try {
+          for (;;) {
+            const next = this.want.find((t) => !this.isReady(t));
+            if (!next || !this.configured()) break;
+            try { await this.clip(next); } catch (e) { break; }
+          }
+        } finally { this.pumping = false; }
+      },
+      async speak(text, rate, onWait, onStart) {
+        const token = ++Player.token;
+        Player.unlock();
+        const timer = setTimeout(() => { if (onWait) onWait(); }, 350);
+        let c;
+        try { c = await this.clip(text); } finally { clearTimeout(timer); }
+        if (token !== Player.token) throw CANCELED;
+        if (!c || !c.url) return;
+        if (onStart) onStart();
+        await Player.play(c.url, rate, token);
+      },
+      stop() { Player.stop(); },
+    };
+    if (E.configured()) E.state = 'ready';
+    return E;
+  }
+  const azure = createAzure();
+
   window.NeuralVoices = {
     list: [paola, sara],
-    get(id) { return this.list.find((v) => v.id === id) || null; },
+    azure,
+    get(id) {
+      if (id && id.startsWith('azure:')) { azure.setVoice(id.slice(6)); return azure; }
+      return this.list.find((v) => v.id === id) || null;
+    },
     available() { return !!(window.Worker && window.WebAssembly && typeof BigInt64Array !== 'undefined' && window.Blob); },
     unlock() { Player.unlock(); },
     stopAll() { Player.stop(); },
