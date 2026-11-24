@@ -2,55 +2,65 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="theme-color" content="#1f4e79">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Libri">
+  <meta name="description" content="Legge ad alta voce i tuoi libri PDF, li mostra e ti permette di annotarli. Tutto sul tuo telefono.">
   <title>Lettore di Libri</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="topbar">
-    <h1>📖 Lettore di Libri</h1>
-    <label class="btn btn-file">
-      Apri PDF
+    <h1 id="appTitle">📖 Lettore di Libri</h1>
+    <label class="iconbtn" aria-label="Apri un PDF">
+      📂<span>Apri</span>
       <input id="fileInput" type="file" accept="application/pdf,.pdf" hidden>
     </label>
   </header>
 
-  <main>
-    <section id="welcome" class="card welcome">
-      <p class="big">Scegli un libro in formato PDF e premi <strong>Leggi</strong>.</p>
-      <p>Il libro resta sul tuo dispositivo: nessun dato viene inviato in rete.
-         Quando riapri la pagina, la lettura riprende dal punto in cui eri arrivato.</p>
-      <label class="btn btn-primary btn-large">
-        📂 Scegli un PDF
-        <input id="fileInput2" type="file" accept="application/pdf,.pdf" hidden>
-      </label>
+  <main id="views">
+    <!-- Benvenuto -->
+    <section id="welcome" class="view active">
+      <div class="card welcome">
+        <div class="welcome-icon">📖</div>
+        <p class="big">Scegli un libro in formato PDF.</p>
+        <p>Puoi ascoltarlo, sfogliarlo e annotarlo. Il libro resta sul tuo telefono:
+           nessun dato viene inviato in rete.</p>
+        <label class="btn btn-primary btn-large">
+          📂 Scegli un PDF
+          <input id="fileInput2" type="file" accept="application/pdf,.pdf" hidden>
+        </label>
+        <p id="installHint" class="hint hidden"></p>
+      </div>
     </section>
 
-    <section id="reader" class="hidden">
-      <div class="bookinfo">
-        <span id="bookTitle" class="booktitle"></span>
-        <span id="status" class="status" aria-live="polite"></span>
-      </div>
-
-      <div class="controls card">
+    <!-- Ascolta -->
+    <section id="viewListen" class="view" aria-label="Ascolta">
+      <div class="controls">
+        <div class="statusrow">
+          <span id="status" class="status" aria-live="polite"></span>
+        </div>
         <div class="row main-buttons">
-          <button id="btnPrev" class="btn" title="Pagina precedente" aria-label="Pagina precedente">⏮<span>Pag. prec.</span></button>
+          <button id="btnPrev" class="btn" aria-label="Pagina precedente">⏮<span>Pag. prec.</span></button>
           <button id="btnPlay" class="btn btn-primary" aria-label="Leggi">▶<span>Leggi</span></button>
           <button id="btnPause" class="btn btn-primary hidden" aria-label="Pausa">⏸<span>Pausa</span></button>
           <button id="btnResume" class="btn btn-primary hidden" aria-label="Riprendi">⏯<span>Riprendi</span></button>
           <button id="btnStop" class="btn" aria-label="Stop">⏹<span>Stop</span></button>
-          <button id="btnNext" class="btn" title="Pagina successiva" aria-label="Pagina successiva">⏭<span>Pag. succ.</span></button>
+          <button id="btnNext" class="btn" aria-label="Pagina successiva">⏭<span>Pag. succ.</span></button>
         </div>
-
         <div class="row pagenav">
           <label for="pageInput">Pagina</label>
           <input id="pageInput" type="number" min="1" value="1" inputmode="numeric">
           <span>di <span id="pageCount">–</span></span>
+          <button id="btnSettings" class="chip" aria-expanded="false" aria-controls="settings">⚙️ Voce</button>
         </div>
-
-        <details class="settings">
-          <summary>⚙️ Voce e velocità</summary>
+        <div id="settings" class="settings hidden">
           <div class="field">
             <label for="voiceSelect">Voce</label>
             <select id="voiceSelect"></select>
@@ -63,17 +73,98 @@
             <label for="fontInput">Dimensione testo</label>
             <input id="fontInput" type="range" min="16" max="36" step="1" value="22">
           </div>
-        </details>
+        </div>
       </div>
 
+      <div id="deletedNote" class="note hidden">Questa pagina è segnata come eliminata nelle modifiche.</div>
       <article id="pageText" class="card pagetext" aria-label="Testo della pagina"></article>
-      <p class="hint">Suggerimento: tocca una frase per iniziare a leggere da lì.</p>
+      <p class="hint">Tocca una frase per iniziare a leggere da lì.</p>
+    </section>
+
+    <!-- Pagine -->
+    <section id="viewPages" class="view" aria-label="Pagine">
+      <div id="pagesScroll" class="pages-scroll">
+        <div id="pagesInner" class="pages-inner"></div>
+      </div>
     </section>
   </main>
 
-  <div id="loading" class="loading hidden" role="status">Caricamento del libro…</div>
+  <!-- Barra strumenti delle pagine (sopra la barra delle schede) -->
+  <div id="pagesBar" class="pagesbar hidden">
+    <div id="viewTools" class="toolrow">
+      <button id="zoomOut" class="tool" aria-label="Riduci">➖</button>
+      <span id="zoomLabel" class="zoomlabel">100%</span>
+      <button id="zoomIn" class="tool" aria-label="Ingrandisci">➕</button>
+      <span class="sep"></span>
+      <button id="miniPlay" class="tool" aria-label="Leggi">▶</button>
+      <span id="miniInfo" class="mini-info">Pag. 1</span>
+      <span class="sep"></span>
+      <button id="editToggle" class="tool tool-wide" aria-pressed="false">✏️<span>Modifica</span></button>
+    </div>
+
+    <div id="editTools" class="hidden">
+      <div class="toolrow">
+        <button class="tool tool-wide" data-tool="pan" aria-label="Scorri">✋<span>Scorri</span></button>
+        <button class="tool tool-wide" data-tool="pen" aria-label="Penna">🖊️<span>Penna</span></button>
+        <button class="tool tool-wide" data-tool="hl" aria-label="Evidenziatore">🖍️<span>Evidenzia</span></button>
+        <button class="tool tool-wide" data-tool="text" aria-label="Testo">🔤<span>Testo</span></button>
+        <button class="tool tool-wide" data-tool="eraser" aria-label="Gomma">🧽<span>Gomma</span></button>
+      </div>
+      <div class="toolrow">
+        <div id="swatches" class="swatches" role="radiogroup" aria-label="Colore"></div>
+        <span class="sep"></span>
+        <button id="undoBtn" class="tool" aria-label="Annulla l'ultima modifica">↶</button>
+        <button id="saveBtn" class="tool tool-primary" aria-label="Salva il PDF">💾</button>
+        <button id="editDone" class="tool tool-wide" aria-label="Fine modifica">✔<span>Fine</span></button>
+      </div>
+    </div>
+  </div>
+
+  <nav id="tabbar" class="tabbar hidden" aria-label="Sezioni">
+    <button class="tab" data-view="viewListen">🎧<span>Ascolta</span></button>
+    <button class="tab" data-view="viewPages">📄<span>Pagine</span></button>
+  </nav>
+
+  <!-- Finestra per aggiungere / modificare un testo -->
+  <dialog id="textDialog" class="sheet">
+    <form method="dialog">
+      <h2 id="textDialogTitle">Aggiungi testo</h2>
+      <textarea id="textValue" rows="3" placeholder="Scrivi qui…"></textarea>
+      <div class="field">
+        <label for="textSize">Dimensione</label>
+        <select id="textSize">
+          <option value="10">Piccola</option>
+          <option value="16" selected>Media</option>
+          <option value="24">Grande</option>
+          <option value="36">Molto grande</option>
+        </select>
+      </div>
+      <div class="dialog-buttons">
+        <button value="delete" id="textDelete" class="btn btn-danger hidden">Elimina</button>
+        <button value="cancel" class="btn">Annulla</button>
+        <button value="ok" class="btn btn-primary">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Finestra di salvataggio -->
+  <dialog id="saveDialog" class="sheet">
+    <form method="dialog">
+      <h2>PDF pronto</h2>
+      <p id="saveInfo"></p>
+      <div class="dialog-buttons">
+        <button value="cancel" class="btn">Chiudi</button>
+        <button value="share" id="shareBtn" class="btn hidden">📤 Condividi</button>
+        <button value="download" class="btn btn-primary">⬇️ Scarica</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="loading" class="loading hidden" role="status"><span id="loadingText">Caricamento…</span></div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
   <script src="lib/pdf.min.js"></script>
   <script src="app.js"></script>
+  <script src="viewer.js"></script>
 </body>
 </html>

@@ -1,4 +1,5 @@
-/* Lettore di Libri — legge ad alta voce i PDF, tutto in locale nel browser. */
+/* Lettore di Libri — nucleo: apertura PDF, lettura vocale, salvataggi, schede.
+   Tutto avviene in locale nel browser. */
 (function () {
   'use strict';
 
@@ -6,9 +7,9 @@
   const $ = (id) => document.getElementById(id);
   const el = {
     fileInputs: [$('fileInput'), $('fileInput2')],
+    appTitle: $('appTitle'),
     welcome: $('welcome'),
-    reader: $('reader'),
-    bookTitle: $('bookTitle'),
+    tabbar: $('tabbar'),
     status: $('status'),
     btnPlay: $('btnPlay'),
     btnPause: $('btnPause'),
@@ -16,6 +17,8 @@
     btnStop: $('btnStop'),
     btnPrev: $('btnPrev'),
     btnNext: $('btnNext'),
+    btnSettings: $('btnSettings'),
+    settings: $('settings'),
     pageInput: $('pageInput'),
     pageCount: $('pageCount'),
     voiceSelect: $('voiceSelect'),
@@ -23,14 +26,19 @@
     rateValue: $('rateValue'),
     fontInput: $('fontInput'),
     pageText: $('pageText'),
+    deletedNote: $('deletedNote'),
     loading: $('loading'),
+    loadingText: $('loadingText'),
+    toast: $('toast'),
+    installHint: $('installHint'),
   };
 
   const synth = window.speechSynthesis;
 
-  // ---------- Stato ----------
+  // ---------- Stato condiviso ----------
   const state = {
     pdf: null,
+    bytes: null,     // copia dei byte originali (serve per salvare il PDF modificato)
     bookKey: null,
     bookName: '',
     page: 1,
@@ -41,8 +49,15 @@
     voices: [],
     pageCache: new Map(),
     wakeLock: null,
-    errors: 0,        // errori consecutivi della sintesi vocale
+    errors: 0,       // errori consecutivi della sintesi vocale
+    view: null,
   };
+
+  // Modifiche al PDF: annotazioni, rotazioni ed eliminazioni per numero di pagina.
+  const emptyEdits = () => ({ ann: {}, rot: {}, del: {} });
+
+  const events = new EventTarget();
+  const emit = (name, detail) => events.dispatchEvent(new CustomEvent(name, { detail }));
 
   // ---------- Archiviazione locale ----------
   const store = {
@@ -57,7 +72,7 @@
     },
   };
 
-  // IndexedDB: conserva l'ultimo PDF aperto, così si riapre da solo.
+  // IndexedDB: conserva l'ultimo PDF aperto e le modifiche di ogni libro.
   const idb = {
     open() {
       return new Promise((resolve, reject) => {
@@ -93,25 +108,63 @@
     store.set('last', state.bookKey);
   }
 
+  let editsTimer = null;
+  function saveEdits() {
+    if (!state.bookKey) return;
+    clearTimeout(editsTimer);
+    const key = 'edits:' + state.bookKey;
+    editsTimer = setTimeout(() => { idb.put(key, App.edits).catch(() => {}); }, 300);
+  }
+
   function setStatus(text) { el.status.textContent = text || ''; }
+
+  function showLoading(text) {
+    el.loadingText.textContent = text || 'Caricamento…';
+    el.loading.classList.remove('hidden');
+  }
+  function hideLoading() { el.loading.classList.add('hidden'); }
+
+  let toastTimer = null;
+  function toast(text, ms) {
+    el.toast.textContent = text;
+    el.toast.classList.remove('hidden');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.toast.classList.add('hidden'), ms || 2500);
+  }
+
+  // ---------- Schede ----------
+  function showView(id) {
+    if (!state.pdf && id !== 'welcome') id = 'welcome';
+    document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === id));
+    document.querySelectorAll('.tab').forEach((t) => {
+      const on = t.dataset.view === id;
+      t.classList.toggle('active', on);
+      if (on) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current');
+    });
+    const prev = state.view;
+    state.view = id;
+    if (id !== 'welcome') store.set('view', id);
+    emit('viewchange', { view: id, prev });
+    if (id === 'viewListen') highlight(true);
+  }
 
   // ---------- pdf.js ----------
   // Se la pagina è aperta da file:// i Web Worker non funzionano: in quel caso
   // carichiamo il worker nel thread principale (più lento ma funziona ovunque).
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Impossibile caricare ' + src));
+      document.head.appendChild(s);
+    });
+  }
   function setupPdfJs() {
-    if (!window.pdfjsLib) throw new Error('pdf.js non caricato');
+    if (!window.pdfjsLib) return Promise.reject(new Error('pdf.js non caricato'));
     const workerUrl = 'lib/pdf.worker.min.js';
-    if (location.protocol === 'file:') {
-      return new Promise((resolve) => {
-        const s = document.createElement('script');
-        s.src = workerUrl;
-        s.onload = resolve;
-        s.onerror = resolve;
-        document.head.appendChild(s);
-        pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
-      });
-    }
     pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+    if (location.protocol === 'file:') return loadScript(workerUrl).catch(() => {});
     return Promise.resolve();
   }
   const pdfReady = setupPdfJs();
@@ -122,43 +175,56 @@
       alert('Il file scelto non sembra un PDF.');
       return;
     }
+    showLoading('Apro il libro…');
     const buffer = await file.arrayBuffer();
     const key = file.name + '|' + file.size;
-    // Copia per IndexedDB: pdf.js può "consumare" il buffer originale.
     idb.put('last', { key, name: file.name, data: buffer.slice(0) }).catch(() => {});
     await loadPdf(new Uint8Array(buffer), file.name, key);
   }
 
   async function loadPdf(data, name, key) {
     stop(false);
-    el.loading.classList.remove('hidden');
+    showLoading('Apro il libro…');
+    let pdf;
     try {
       await pdfReady;
-      if (state.pdf) { try { state.pdf.destroy(); } catch (e) { /* ignora */ } }
-      state.pdf = await pdfjsLib.getDocument({ data, isEvalSupported: false }).promise;
+      // pdf.js può trasferire il buffer al worker: gli passiamo una copia.
+      pdf = await pdfjsLib.getDocument({ data: data.slice(), isEvalSupported: false }).promise;
     } catch (err) {
-      el.loading.classList.add('hidden');
+      hideLoading();
       console.error(err);
       alert('Impossibile aprire il PDF. Il file potrebbe essere danneggiato o protetto da password.');
       return;
     }
+    if (state.pdf) { try { state.pdf.destroy(); } catch (e) { /* ignora */ } }
+    state.pdf = pdf;
+    state.bytes = data;
     state.bookKey = key;
     state.bookName = name;
     state.pageCache.clear();
-    el.bookTitle.textContent = name.replace(/\.pdf$/i, '');
-    document.title = el.bookTitle.textContent + ' – Lettore di Libri';
-    el.pageCount.textContent = state.pdf.numPages;
-    el.pageInput.max = state.pdf.numPages;
+
+    App.edits = emptyEdits();
+    try {
+      const saved = await idb.get('edits:' + key);
+      if (saved && saved.ann) App.edits = Object.assign(emptyEdits(), saved);
+    } catch (e) { /* nessuna modifica salvata */ }
+
+    const title = name.replace(/\.pdf$/i, '');
+    el.appTitle.textContent = title;
+    document.title = title + ' – Lettore di Libri';
+    el.pageCount.textContent = pdf.numPages;
+    el.pageInput.max = pdf.numPages;
 
     const pos = store.get('pos:' + key, { page: 1, sentence: 0 });
-    const page = Math.min(Math.max(1, pos.page | 0), state.pdf.numPages);
+    const page = Math.min(Math.max(1, pos.page | 0), pdf.numPages);
 
-    el.welcome.classList.add('hidden');
-    el.reader.classList.remove('hidden');
+    el.tabbar.classList.remove('hidden');
     await showPage(page, pos.sentence | 0);
-    el.loading.classList.add('hidden');
+    hideLoading();
     store.set('last', key);
     if (page > 1 || pos.sentence > 0) setStatus('Ripreso da pagina ' + page);
+    emit('bookloaded');
+    showView(store.get('view', 'viewListen') === 'viewPages' ? 'viewPages' : 'viewListen');
   }
 
   // ---------- Estrazione testo ----------
@@ -171,8 +237,7 @@
     for (const item of content.items) {
       if (typeof item.str !== 'string') continue;
       const y = item.transform ? item.transform[5] : null;
-      if (lastY !== null && y !== null && Math.abs(y - lastY) > 2 &&
-          text && !/\s$/.test(text)) {
+      if (lastY !== null && y !== null && Math.abs(y - lastY) > 2 && text && !/\s$/.test(text)) {
         text += '\n';
       }
       text += item.str;
@@ -219,7 +284,7 @@
     return out;
   }
 
-  // ---------- Visualizzazione ----------
+  // ---------- Visualizzazione del testo ----------
   async function showPage(n, sentenceIndex) {
     state.page = n;
     state.sentences = await getPageText(n);
@@ -227,12 +292,13 @@
     el.pageInput.value = n;
     el.btnPrev.disabled = n <= 1;
     el.btnNext.disabled = n >= state.pdf.numPages;
+    el.deletedNote.classList.toggle('hidden', !(App.edits && App.edits.del[n]));
 
     el.pageText.innerHTML = '';
     if (!state.sentences.length) {
       const p = document.createElement('p');
       p.className = 'empty';
-      p.textContent = 'Questa pagina non contiene testo leggibile (potrebbe essere vuota o un\'immagine scansionata).';
+      p.textContent = 'Questa pagina non contiene testo leggibile (potrebbe essere vuota o un\'immagine scansionata). Puoi vederla nella scheda Pagine.';
       el.pageText.appendChild(p);
     } else {
       const frag = document.createDocumentFragment();
@@ -248,6 +314,7 @@
     }
     highlight(state.mode !== 'stopped' || sentenceIndex > 0);
     savePosition();
+    emit('pagechange', { page: n });
     // Precarica la pagina successiva per un passaggio senza pause.
     if (n < state.pdf.numPages) getPageText(n + 1).catch(() => {});
   }
@@ -259,7 +326,7 @@
     const cur = el.pageText.querySelector('.s[data-i="' + state.sentence + '"]');
     if (cur) {
       cur.classList.add('current');
-      if (scroll) cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (scroll && state.view === 'viewListen') cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
   }
 
@@ -271,6 +338,7 @@
     el.btnStop.disabled = m === 'stopped';
     if (m === 'playing') setStatus('In lettura… pagina ' + state.page);
     else if (m === 'paused') setStatus('In pausa');
+    emit('modechange', { mode: m });
   }
 
   // ---------- Sintesi vocale ----------
@@ -304,7 +372,7 @@
     if (!chosen) chosen = it.find((v) => v.default) || it.find((v) => v.lang === 'it-IT') || it[0] || all.find((v) => v.default) || all[0];
     if (chosen) el.voiceSelect.value = chosen.voiceURI || chosen.name;
 
-    if (!it.length) setStatus('Nessuna voce italiana installata: scegline una nelle impostazioni.');
+    if (!it.length) setStatus('Nessuna voce italiana installata: scegline una in ⚙️ Voce.');
   }
 
   function currentVoice() {
@@ -312,14 +380,22 @@
     return state.voices.find((v) => (v.voiceURI || v.name) === id) || null;
   }
 
+  function nextReadablePage(from) {
+    for (let n = from + 1; n <= state.pdf.numPages; n++) {
+      if (!App.edits.del[n]) return n;
+    }
+    return 0;
+  }
+
   function speakCurrent() {
     if (state.mode !== 'playing') return;
     const myToken = ++state.token;
 
     if (state.sentence >= state.sentences.length) {
-      // Fine pagina: passa alla successiva (saltando quelle senza testo).
-      if (state.page < state.pdf.numPages) {
-        showPage(state.page + 1, 0).then(() => {
+      // Fine pagina: passa alla successiva (saltando quelle eliminate).
+      const next = nextReadablePage(state.page);
+      if (next) {
+        showPage(next, 0).then(() => {
           if (state.mode === 'playing' && myToken === state.token) speakCurrent();
         });
       } else {
@@ -391,6 +467,12 @@
     play(); // riprende dall'inizio della frase interrotta
   }
 
+  function togglePlay() {
+    if (state.mode === 'playing') pause();
+    else if (state.mode === 'paused') resume();
+    else play();
+  }
+
   function stop(resetToStart = true) {
     cancelSpeech();
     state.mode = 'stopped';
@@ -401,13 +483,13 @@
     releaseWakeLock();
   }
 
-  async function goToPage(n) {
+  async function goToPage(n, sentence) {
     if (!state.pdf) return;
     n = Math.min(Math.max(1, n | 0), state.pdf.numPages);
     const wasPlaying = state.mode === 'playing';
     cancelSpeech();
     if (state.mode === 'paused') state.mode = 'stopped';
-    await showPage(n, 0);
+    await showPage(n, sentence || 0);
     updateButtons();
     if (wasPlaying) play();
   }
@@ -426,12 +508,21 @@
     state.wakeLock = null;
   }
 
+  // ---------- API condivisa con viewer.js ----------
+  const App = window.App = {
+    state, el, events, store, idb, edits: emptyEdits(),
+    play, pause, resume, stop, togglePlay, goToPage, showView,
+    saveEdits, showLoading, hideLoading, toast, loadScript,
+  };
+
   // ---------- Eventi ----------
   el.fileInputs.forEach((input) => input.addEventListener('change', (e) => {
     const f = e.target.files && e.target.files[0];
     e.target.value = '';
-    openFile(f);
+    openFile(f).catch((err) => { hideLoading(); console.error(err); alert('Errore durante l\'apertura del file.'); });
   }));
+
+  document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => showView(t.dataset.view)));
 
   el.btnPlay.addEventListener('click', play);
   el.btnPause.addEventListener('click', pause);
@@ -442,6 +533,10 @@
   el.pageInput.addEventListener('change', () => {
     const n = parseInt(el.pageInput.value, 10) || 1;
     if (n !== state.page) goToPage(n);
+  });
+  el.btnSettings.addEventListener('click', () => {
+    const open = el.settings.classList.toggle('hidden') === false;
+    el.btnSettings.setAttribute('aria-expanded', String(open));
   });
 
   el.pageText.addEventListener('click', (e) => {
@@ -471,13 +566,9 @@
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.target.matches('input, select, textarea')) return;
-    if (e.code === 'Space') {
-      e.preventDefault();
-      if (state.mode === 'playing') pause();
-      else if (state.mode === 'paused') resume();
-      else play();
-    } else if (e.key === 'ArrowRight' && e.altKey) goToPage(state.page + 1);
+    if (e.target.matches('input, select, textarea') || document.querySelector('dialog[open]')) return;
+    if (e.code === 'Space' && state.pdf) { e.preventDefault(); togglePlay(); }
+    else if (e.key === 'ArrowRight' && e.altKey) goToPage(state.page + 1);
     else if (e.key === 'ArrowLeft' && e.altKey) goToPage(state.page - 1);
   });
 
@@ -485,6 +576,31 @@
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && state.mode === 'playing') requestWakeLock();
   });
+
+  // ---------- Installazione come app ----------
+  function setupInstall() {
+    if (/^https?:$/.test(location.protocol) && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+    const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+    if (standalone) return;
+    if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
+      el.installHint.textContent = 'Per installarla: tocca Condividi ⬆️ e poi «Aggiungi alla schermata Home».';
+      el.installHint.classList.remove('hidden');
+    }
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      el.installHint.innerHTML = '';
+      const b = document.createElement('button');
+      b.className = 'btn';
+      b.style.flexDirection = 'row';
+      b.style.fontSize = '1rem';
+      b.textContent = '📲 Installa come app';
+      b.addEventListener('click', () => { e.prompt(); el.installHint.classList.add('hidden'); });
+      el.installHint.appendChild(b);
+      el.installHint.classList.remove('hidden');
+    });
+  }
 
   // ---------- Avvio ----------
   function init() {
@@ -498,21 +614,25 @@
     if (synth) {
       loadVoices();
       if ('onvoiceschanged' in synth) synth.addEventListener('voiceschanged', loadVoices);
-      // Alcuni browser caricano le voci in ritardo senza evento.
-      setTimeout(loadVoices, 500);
+      setTimeout(loadVoices, 500); // alcuni browser caricano le voci in ritardo
     } else {
       setStatus('Sintesi vocale non supportata da questo browser.');
     }
     updateButtons();
+    setupInstall();
+    showView('welcome');
 
     // Riapre automaticamente l'ultimo libro.
-    const lastKey = store.get('last', null);
-    if (lastKey) {
+    if (store.get('last', null)) {
+      showLoading('Riapro l\'ultimo libro…');
       idb.get('last').then((rec) => {
-        if (rec && rec.data && !state.pdf) loadPdf(new Uint8Array(rec.data), rec.name, rec.key);
-      }).catch(() => {});
+        if (rec && rec.data && !state.pdf) return loadPdf(new Uint8Array(rec.data), rec.name, rec.key);
+        hideLoading();
+      }).catch(() => hideLoading());
     }
   }
 
-  init();
+  // viewer.js si aggancia agli eventi: avviamo dopo che tutti gli script sono caricati.
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();
