@@ -23,6 +23,10 @@
     pageCount: $('pageCount'),
     voiceSelect: $('voiceSelect'),
     voiceTip: $('voiceTip'),
+    neuralBox: $('neuralBox'),
+    neuralBtn: $('neuralBtn'),
+    neuralProg: $('neuralProg'),
+    neuralMsg: $('neuralMsg'),
     rateInput: $('rateInput'),
     rateValue: $('rateValue'),
     fontInput: $('fontInput'),
@@ -381,10 +385,13 @@
     return 'Le voci più naturali sono in Microsoft Edge (voci «Online (Natural)», es. Isabella o Diego) e in Chrome («Google italiano»).';
   }
 
+  const Neural = window.NeuralTTS;
+  const neuralOk = !!(Neural && Neural.available());
+  const isNeural = () => neuralOk && el.voiceSelect.value === Neural.id;
+
   function loadVoices() {
-    if (!synth) return;
-    const all = synth.getVoices();
-    if (!all.length) return;
+    const all = synth ? synth.getVoices() : [];
+    if (!all.length && !neuralOk) return;
     const info = new Map(all.map((v) => [v, voiceInfo(v)]));
     const it = all.filter((v) => /^it/i.test(v.lang))
       .sort((a, b) => info.get(b).score - info.get(a).score || a.name.localeCompare(b.name));
@@ -407,20 +414,62 @@
       });
       el.voiceSelect.appendChild(g);
     };
-    addGroup('Voci italiane (le migliori in alto)', it);
+    if (neuralOk) {
+      const g = document.createElement('optgroup');
+      g.label = 'Voce naturale (neurale, funziona offline)';
+      const o = document.createElement('option');
+      o.value = Neural.id;
+      o.textContent = '✨ Paola — la più naturale';
+      g.appendChild(o);
+      el.voiceSelect.appendChild(g);
+    }
+    addGroup('Voci italiane del telefono (le migliori in alto)', it);
     addGroup('Altre lingue', others);
 
     // Scelta automatica: la voce italiana di qualità più alta, se non ne hai scelta una tu.
     let chosen = state.voices.find((v) => (v.voiceURI || v.name) === saved);
     if (!chosen) chosen = it[0] || all.find((v) => v.default) || all[0];
-    if (chosen) el.voiceSelect.value = chosen.voiceURI || chosen.name;
+    if (neuralOk && (saved === Neural.id || (!saved && !it.length))) el.voiceSelect.value = Neural.id;
+    else if (chosen) el.voiceSelect.value = chosen.voiceURI || chosen.name;
 
     const bestTag = it.length ? info.get(it[0]).tag : '';
-    el.voiceTip.textContent = bestTag ? '' : voiceTip();
-    el.voiceTip.classList.toggle('hidden', !!bestTag);
-    el.btnSettings.textContent = bestTag || !it.length ? '⚙️ Voce' : '⚙️ Voce 💡';
+    el.voiceTip.textContent = bestTag ? '' : voiceTip() + (neuralOk ? ' Oppure usa la voce naturale Paola qui sopra.' : '');
+    el.voiceTip.classList.toggle('hidden', !!bestTag || isNeural());
+    updateNeuralUi();
 
-    if (!it.length) setStatus('Nessuna voce italiana installata: apri ⚙️ Voce per sapere come aggiungerla.');
+    if (!it.length && !neuralOk) setStatus('Nessuna voce italiana installata: apri ⚙️ Voce per sapere come aggiungerla.');
+  }
+
+  // ---------- Voce naturale (Paola) ----------
+  function updateNeuralUi() {
+    if (!el.neuralBox) return;
+    el.neuralBox.classList.toggle('hidden', !neuralOk);
+    if (!neuralOk) { el.btnSettings.textContent = '⚙️ Voce'; return; }
+    const st = Neural.state;
+    const active = isNeural();
+    el.neuralProg.classList.toggle('hidden', st !== 'loading');
+    el.neuralProg.value = Math.round(Neural.progress * 100);
+    let msg = '';
+    let btn = '';
+    if (st === 'loading') msg = Neural.preparing ? 'Preparo la voce…' : 'Scarico la voce: ' + Math.round(Neural.progress * 100) + '% di ' + Neural.sizeMB + ' MB';
+    else if (st === 'error') { msg = 'Non è stato possibile avviare la voce naturale: ' + Neural.error; btn = 'Riprova'; }
+    else if (active && st === 'ready') msg = 'Voce naturale attiva ✓ Funziona anche senza internet.';
+    else if (active) msg = 'Selezionata: si avvia quando premi Leggi.';
+    else btn = neuralDownloaded ? 'Usa Paola' : 'Scarica e usa Paola (' + Neural.sizeMB + ' MB)';
+    el.neuralMsg.textContent = msg;
+    el.neuralBtn.textContent = btn;
+    el.neuralBtn.classList.toggle('hidden', !btn);
+    el.btnSettings.textContent = active ? '⚙️ Voce' : '⚙️ Voce ✨';
+    if (state.mode === 'playing' && isNeural() && st === 'loading') setStatus(msg);
+  }
+
+  let neuralDownloaded = false;
+  function useNeural() {
+    el.voiceSelect.value = Neural.id;
+    store.set('voice', Neural.id);
+    el.voiceTip.classList.add('hidden');
+    Neural.load().catch(() => {});
+    updateNeuralUi();
   }
 
   function currentVoice() {
@@ -457,6 +506,8 @@
     highlight(true);
     savePosition();
 
+    if (isNeural()) { speakNeural(myToken); return; }
+
     const u = new SpeechSynthesisUtterance(state.sentences[state.sentence]);
     const voice = currentVoice();
     if (voice) { u.voice = voice; u.lang = voice.lang; } else { u.lang = 'it-IT'; }
@@ -483,14 +534,49 @@
     synth.speak(u);
   }
 
+  function speakNeural(myToken) {
+    const rate = parseFloat(el.rateInput.value) || 1;
+    const text = state.sentences[state.sentence];
+    if (Neural.state !== 'ready') {
+      setStatus('Preparo la voce naturale…');
+      Neural.load().then(() => { if (myToken === state.token && state.mode === 'playing') updateButtons(); }).catch(() => {});
+    }
+    Neural.speak(text, rate).then(() => {
+      if (myToken !== state.token || state.mode !== 'playing') return;
+      state.errors = 0;
+      state.sentence++;
+      speakCurrent();
+    }).catch((err) => {
+      if (myToken !== state.token || (err && err.canceled)) return;
+      console.warn('Voce naturale:', err);
+      if (err && err.name === 'NotAllowedError') { pause(); setStatus('Premi Riprendi per continuare'); return; }
+      if (Neural.state === 'error' || ++state.errors >= 3) {
+        pause();
+        setStatus('La voce naturale non funziona su questo dispositivo: scegli un\'altra voce in ⚙️ Voce.');
+        return;
+      }
+      state.sentence++;
+      setTimeout(speakCurrent, 50);
+    });
+    // Prepara in anticipo la frase successiva (anche della pagina dopo), così non ci sono pause.
+    const nextText = state.sentences[state.sentence + 1];
+    if (nextText) Neural.prefetch(nextText, rate);
+    else {
+      const np = nextReadablePage(state.page);
+      if (np) getPageText(np).then((ss) => { if (ss[0]) Neural.prefetch(ss[0], rate); }).catch(() => {});
+    }
+  }
+
   function cancelSpeech() {
     state.token++;
     if (synth) synth.cancel();
+    if (neuralOk) Neural.stop();
   }
 
   function play() {
-    if (!synth) { alert('Questo browser non supporta la sintesi vocale.'); return; }
+    if (!synth && !isNeural()) { alert('Questo browser non supporta la sintesi vocale.'); return; }
     if (!state.pdf) return;
+    if (isNeural()) Neural.unlock(); // va fatto subito, dentro il tocco
     cancelSpeech();
     state.errors = 0;
     state.mode = 'playing';
@@ -597,8 +683,19 @@
 
   el.voiceSelect.addEventListener('change', () => {
     store.set('voice', el.voiceSelect.value);
+    if (isNeural()) useNeural();
+    else { updateNeuralUi(); el.voiceTip.classList.toggle('hidden', !el.voiceTip.textContent); }
     if (state.mode === 'playing') play(); // riparte la frase con la nuova voce
   });
+  if (neuralOk) {
+    el.neuralBtn.addEventListener('click', () => { Neural.unlock(); useNeural(); });
+    Neural.onChange(updateNeuralUi);
+    Neural.isDownloaded().then((ok) => {
+      neuralDownloaded = ok;
+      updateNeuralUi();
+      if (ok && isNeural()) Neural.load().catch(() => {}); // prepara subito la voce già scaricata
+    });
+  }
 
   let rateTimer = null;
   el.rateInput.addEventListener('input', () => {
@@ -660,8 +757,8 @@
     el.fontInput.value = font;
     document.documentElement.style.setProperty('--font-size', font + 'px');
 
+    loadVoices();
     if (synth) {
-      loadVoices();
       if ('onvoiceschanged' in synth) synth.addEventListener('voiceschanged', loadVoices);
       setTimeout(loadVoices, 500); // alcuni browser caricano le voci in ritardo
     } else {

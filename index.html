@@ -234,6 +234,14 @@
           <button id="btnSettings" class="chip" aria-expanded="false" aria-controls="settings">⚙️ Voce</button>
         </div>
         <div id="settings" class="settings hidden">
+          <div id="neuralBox" class="neural-box hidden">
+            <div class="neural-head">✨ <strong>Voce naturale «Paola»</strong></div>
+            <p class="neural-text">Una voce italiana neurale, molto meno robotica, che lavora direttamente sul telefono, anche senza internet.
+              Si scarica una volta sola (circa 65 MB: meglio con il Wi-Fi).</p>
+            <button id="neuralBtn" class="btn btn-primary neural-btn" type="button">Scarica e usa Paola</button>
+            <progress id="neuralProg" class="neural-prog hidden" max="100" value="0"></progress>
+            <p id="neuralMsg" class="neural-msg" aria-live="polite"></p>
+          </div>
           <div class="field">
             <label for="voiceSelect">Voce</label>
             <select id="voiceSelect"></select>
@@ -314,6 +322,7 @@
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
   <script src="lib/pdf.min.js"></script>
+  <script src="tts-neural.js"></script>
   <script src="app.js"></script>
   <script src="viewer.js"></script>
 </body>

@@ -1,5 +1,5 @@
 /* Service worker: rende l'app disponibile anche senza connessione. */
-const CACHE = 'libro-v3';
+const CACHE = 'libro-v4';
 const FILES = [
   './',
   'index.html',
@@ -7,6 +7,9 @@ const FILES = [
   'editor.css',
   'app.js',
   'viewer.js',
+  'tts-neural.js',
+  'lib/piper/piper-worker.js',
+  'lib/piper/piper_phonemize.js',
   'manifest.webmanifest',
   'lib/pdf.min.js',
   'lib/pdf.worker.min.js',
@@ -24,14 +27,17 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => /^libro-v\d+$/.test(k) && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
 // Rete prima (così gli aggiornamenti arrivano subito), cache se offline.
 self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
+  const url = new URL(e.request.url);
+  if (e.request.method !== 'GET' || url.origin !== location.origin) return;
+  // Il modello della voce ha già una cache sua (gestita dal worker della voce).
+  if (url.pathname.includes('/voices/')) return;
   e.respondWith(
     fetch(e.request)
       .then((res) => {

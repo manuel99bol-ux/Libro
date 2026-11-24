@@ -206,6 +206,19 @@ button { font: inherit; color: inherit; }
   margin-bottom: 10px;
   font-size: 0.95rem;
 }
+.neural-box {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+.neural-head { font-size: 1.05rem; }
+.neural-text { margin: 6px 0 10px; font-size: 0.92rem; color: var(--muted); line-height: 1.45; }
+.neural-btn { flex-direction: row; min-height: 48px; font-size: 1rem; width: 100%; }
+.neural-prog { width: 100%; height: 12px; accent-color: var(--primary); }
+.neural-msg { margin: 6px 0 0; font-size: 0.92rem; }
+.neural-msg:empty { display: none; }
 .voice-tip {
   margin: 4px 0 0;
   padding: 8px 10px;
