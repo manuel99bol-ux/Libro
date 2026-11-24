@@ -483,13 +483,24 @@
       });
       el.voiceSelect.appendChild(g);
     }
+    if (claudeTts) {
+      const g = document.createElement('optgroup');
+      g.label = 'Voce di Claude (su computer, nell\'anteprima claude.ai)';
+      CLAUDE_VOICES.forEach(([id, label]) => {
+        const o = document.createElement('option');
+        o.value = 'claude:' + id;
+        o.textContent = '🎙 Claude — ' + label;
+        g.appendChild(o);
+      });
+      el.voiceSelect.appendChild(g);
+    }
     addGroup('Voci italiane del telefono (le migliori in alto)', it);
     addGroup('Altre lingue', others);
 
     // Scelta automatica: la voce italiana di qualità più alta, se non ne hai scelta una tu.
     let chosen = state.voices.find((v) => (v.voiceURI || v.name) === saved);
     if (!chosen) chosen = it[0] || all.find((v) => v.default) || all[0];
-    if (neuralOk && saved && [...el.voiceSelect.options].some((o) => o.value === saved) && NV.get(saved)) el.voiceSelect.value = saved;
+    if (saved && [...el.voiceSelect.options].some((o) => o.value === saved) && (saved.startsWith('claude:') || (neuralOk && NV.get(saved)))) el.voiceSelect.value = saved;
     else if (neuralOk && !saved && !it.length) el.voiceSelect.value = 'neural:paola';
     else if (chosen) el.voiceSelect.value = chosen.voiceURI || chosen.name;
 
@@ -498,7 +509,7 @@
     el.voiceTip.classList.toggle('hidden', !!bestTag || isNeural());
     updateNeuralUi();
 
-    if (!it.length && !neuralOk) setStatus('Nessuna voce italiana installata: apri ⚙️ Voce per sapere come aggiungerla.');
+    if (!it.length && !neuralOk && !claudeTts) setStatus('Nessuna voce italiana installata: apri ⚙️ Voce per sapere come aggiungerla.');
   }
 
   // ---------- Voci naturali (Paola e Sara) ----------
@@ -716,9 +727,137 @@
     return 0;
   }
 
+  // ---------- Voce di Claude (solo nell'anteprima claude.ai, su computer) ----------
+  // La piattaforma legge una pagina intera come elenco di righe (una per frase)
+  // e ci dice quando inizia ogni riga: così l'evidenziazione segue la voce.
+  const CLAUDE_VOICES = [['buttery', 'morbida'], ['airy', 'ariosa'], ['glassy', 'cristallina'], ['rounded', 'rotonda']];
+  let claudeTts = null;
+  let claudeLang = null;
+  const C = { token: 0, page: 0, next: 0, queued: 0, adding: false, done: false };
+  const isClaude = () => !!claudeTts && el.voiceSelect.value.startsWith('claude:');
+
+  async function claudeBatch(n) {
+    const out = [];
+    while (out.length < n) {
+      const list = C.page === state.page ? state.sentences : await getPageText(C.page);
+      if (C.next < list.length) {
+        const text = spoken(list, C.next).slice(0, 2000);
+        if (text.trim()) out.push({ text, id: C.page + ':' + C.next });
+        C.next++;
+      } else {
+        const np = nextReadablePage(C.page);
+        if (!np) { C.done = true; break; }
+        C.page = np;
+        C.next = 0;
+      }
+    }
+    C.queued += out.length;
+    return out;
+  }
+
+  function claudeOpts() {
+    const o = { voice: el.voiceSelect.value.slice(7), rate: Math.min(1.5, Math.max(0.7, parseFloat(el.rateInput.value) || 1)) };
+    if (claudeLang) o.language = claudeLang;
+    return o;
+  }
+
+  function claudeFail(err, myToken) {
+    if (myToken !== state.token || !err || err.code === 'stopped') return;
+    console.warn('Voce di Claude:', err);
+    if (err.code === 'not_granted' || err.code === 'unavailable') {
+      if (err.code === 'not_granted') { claudeTts = null; loadVoices(); }
+      pause();
+      setStatus('La voce di Claude non è disponibile qui: scegli un\'altra voce in Voce.');
+    } else if (err.code === 'no_gesture') {
+      pause();
+      setStatus('Tocca Riprendi per far leggere Claude.');
+    } else if (err.code === 'rate_limited') {
+      pause();
+      setStatus('Claude ha letto molto in poco tempo: riprova fra qualche minuto, o scegli un\'altra voce.');
+    } else if (err.code === 'busy') {
+      pause();
+      setStatus('Il microfono è in uso: riprova fra poco.');
+    } else {
+      pause();
+      setStatus('La voce di Claude si è interrotta. Tocca Riprendi.');
+    }
+  }
+
+  function claudeStart(myToken) {
+    C.token = myToken;
+    C.page = state.page;
+    C.next = state.sentence;
+    C.queued = 0;
+    C.done = false;
+    highlight(true);
+    savePosition();
+    // Le righe vanno passate subito (siamo ancora dentro il tocco su «Leggi»).
+    const first = [];
+    const list = state.sentences;
+    while (C.next < list.length && first.length < 40) {
+      const text = spoken(list, C.next).slice(0, 2000);
+      if (text.trim()) first.push({ text, id: C.page + ':' + C.next });
+      C.next++;
+    }
+    C.queued = first.length;
+    const go = (lines) => claudeTts.speak(lines, claudeOpts()).then(() => claudeMaybeEnd(myToken)).catch((e) => claudeFail(e, myToken));
+    if (first.length) go(first);
+    else claudeBatch(40).then((lines) => { if (myToken !== state.token) return; if (lines.length) go(lines); else claudeMaybeEnd(myToken); });
+  }
+
+  function claudeMaybeEnd(myToken) {
+    if (myToken !== state.token || state.mode !== 'playing' || C.adding) return;
+    if (!claudeTts.active() && C.done) {
+      stop(false);
+      state.sentence = 0;
+      setStatus('Fine del libro 🎉');
+    }
+  }
+
+  function claudeOnLine(e) {
+    if (C.token !== state.token || state.mode !== 'playing' || !e.id) return;
+    const [p, i] = e.id.split(':').map(Number);
+    if (p !== state.page) showPage(p, i).then(updateButtons);
+    else { state.sentence = i; highlight(true); savePosition(); }
+    // Poco prima della fine, aggiunge le righe successive (anche della pagina dopo).
+    if (!C.done && !C.adding && C.queued - e.line <= 5) {
+      C.adding = true;
+      const myToken = C.token;
+      claudeBatch(30).then((lines) => {
+        C.adding = false;
+        if (myToken !== state.token || !lines.length) { claudeMaybeEnd(myToken); return; }
+        claudeTts.add(lines, claudeOpts()).then(() => claudeMaybeEnd(myToken)).catch((err) => claudeFail(err, myToken));
+      }, () => { C.adding = false; });
+    }
+  }
+
+  async function setupClaudeVoice() {
+    try {
+      if (!window.claude || typeof window.claude.use !== 'function') return;
+      const t = await window.claude.use('tts');
+      if (!t) return;
+      claudeTts = t;
+      try {
+        const langs = t.languages ? await t.languages().catch(() => undefined) : undefined;
+        claudeLang = !langs || langs.some((l) => /^it\b/i.test(l)) ? 'it' : null;
+      } catch (e) { claudeLang = 'it'; }
+      t.onLine(claudeOnLine);
+      t.onState((ev) => {
+        if (ev.state === 'idle' && ev.reason === 'viewer_stopped' && isClaude() && state.mode === 'playing') {
+          state.token++;
+          state.mode = 'paused';
+          updateButtons();
+          savePosition();
+        }
+      });
+      loadVoices();
+    } catch (e) { /* non disponibile */ }
+  }
+
   function speakCurrent() {
     if (state.mode !== 'playing') return;
     const myToken = ++state.token;
+    if (isClaude()) { claudeStart(myToken); return; }
 
     if (state.sentence >= state.sentences.length) {
       // Fine pagina: passa alla successiva (saltando quelle eliminate).
@@ -820,10 +959,11 @@
     state.token++;
     if (synth) synth.cancel();
     if (neuralOk) NV.stopAll();
+    if (claudeTts && claudeTts.active()) claudeTts.stop().catch(() => {});
   }
 
   function play() {
-    if (!synth && !isNeural()) { alert('Questo browser non supporta la sintesi vocale.'); return; }
+    if (!synth && !isNeural() && !isClaude()) { alert('Questo browser non supporta la sintesi vocale.'); return; }
     if (!state.pdf) return;
     if (isNeural()) NV.unlock(); // va fatto subito, dentro il tocco
     cancelSpeech();
@@ -831,6 +971,7 @@
     state.mode = 'playing';
     updateButtons();
     requestWakeLock();
+    if (isClaude()) { speakCurrent(); return; } // la voce di Claude parte dentro il tocco
     // Piccolo ritardo: alcuni browser ignorano speak() subito dopo cancel().
     setTimeout(speakCurrent, 80);
   }
@@ -931,7 +1072,9 @@
   el.btnSettings.addEventListener('click', () => setSettings(el.settings.classList.contains('hidden')));
   el.settingsClose.addEventListener('click', () => setSettings(false));
   el.settingsBackdrop.addEventListener('click', () => setSettings(false));
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el.settings.classList.contains('hidden')) setSettings(false); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !el.settings.classList.contains('hidden')) { e.preventDefault(); setSettings(false); }
+  });
 
   // Scorrendo il testo l'intestazione si fa compatta, così resta più spazio per leggere.
   const listenView = document.getElementById('viewListen');
@@ -1070,6 +1213,7 @@
     el.rateValue.textContent = parseFloat(el.rateInput.value).toFixed(1) + '×';
     store.set('rate', el.rateInput.value);
     clearTimeout(rateTimer);
+    if (state.mode === 'playing' && isClaude() && claudeTts.setRate) { claudeTts.setRate(Math.min(1.5, Math.max(0.7, parseFloat(el.rateInput.value) || 1))); return; }
     if (state.mode === 'playing') rateTimer = setTimeout(play, 400);
   });
 
@@ -1126,6 +1270,7 @@
     document.documentElement.style.setProperty('--font-size', font + 'px');
 
     loadVoices();
+    setupClaudeVoice();
     if (synth) {
       if ('onvoiceschanged' in synth) synth.addEventListener('voiceschanged', loadVoices);
       setTimeout(loadVoices, 500); // alcuni browser caricano le voci in ritardo
