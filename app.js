@@ -22,6 +22,7 @@
     pageInput: $('pageInput'),
     pageCount: $('pageCount'),
     voiceSelect: $('voiceSelect'),
+    voiceTip: $('voiceTip'),
     rateInput: $('rateInput'),
     rateValue: $('rateValue'),
     fontInput: $('fontInput'),
@@ -343,13 +344,52 @@
   }
 
   // ---------- Sintesi vocale ----------
+  // Punteggio di qualità: le voci "Premium", "Avanzate", "Naturali" o di Google
+  // suonano molto meno robotiche di quelle compatte o di sistema.
+  const NOVELTY = /\b(eddy|flo|reed|rocko|sandy|shelley|grandma|grandpa|nonna|nonno|albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|fred|junior|kathy|ralph)\b/;
+  function voiceInfo(v) {
+    const id = (v.name + ' ' + (v.voiceURI || '')).toLowerCase();
+    let score = 0;
+    let tag = '';
+    if (/^it/i.test(v.lang)) score += 1000;
+    if (/^it[-_]it/i.test(v.lang)) score += 5;
+    if (/premium/.test(id)) { score += 60; tag = 'Premium'; }
+    else if (/enhanced|avanzat|migliorat/.test(id)) { score += 45; tag = 'Avanzata'; }
+    if (/natural|neural/.test(id)) { score += 60; tag = tag || 'Naturale'; }
+    if (/google/.test(id)) { score += 35; tag = tag || 'Naturale'; }
+    if (/online/.test(id)) score += 10;
+    if (/eloquence|novelty|speech\.synthesis\.voice/.test(id) || NOVELTY.test(id)) score -= 60;
+    if (/compact/.test(id)) score -= 10;
+    if (v.localService === false) score += 5;
+    return { score, tag };
+  }
+
+  function voiceTip() {
+    const ua = navigator.userAgent;
+    if (/iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1)) {
+      return 'Per una voce più naturale: Impostazioni → Accessibilità → Contenuti letti ad alta voce → Voci → Italiano, ' +
+        'scarica una voce «Premium» o «Avanzata» (es. Federica, Alice, Luca), poi chiudi e riapri l\'app.';
+    }
+    if (/android/i.test(ua)) {
+      return 'Per una voce più naturale: Impostazioni → Sistema → Lingue → Output sintesi vocale → Servizi di sintesi vocale di Google ⚙️ → ' +
+        'Installa dati vocali → Italiano, scegli una voce e scarica la versione di alta qualità; poi riapri l\'app.';
+    }
+    if (/macintosh/i.test(ua)) {
+      return 'Per una voce più naturale: Impostazioni di Sistema → Accessibilità → Contenuti letti → Voce di sistema → Gestisci voci → Italiano, ' +
+        'scarica una voce «Premium» o «Avanzata». In Chrome c\'è anche «Google italiano».';
+    }
+    return 'Le voci più naturali sono in Microsoft Edge (voci «Online (Natural)», es. Isabella o Diego) e in Chrome («Google italiano»).';
+  }
+
   function loadVoices() {
     if (!synth) return;
     const all = synth.getVoices();
     if (!all.length) return;
-    const it = all.filter((v) => /^it/i.test(v.lang));
+    const info = new Map(all.map((v) => [v, voiceInfo(v)]));
+    const it = all.filter((v) => /^it/i.test(v.lang))
+      .sort((a, b) => info.get(b).score - info.get(a).score || a.name.localeCompare(b.name));
     const others = all.filter((v) => !/^it/i.test(v.lang))
-      .sort((a, b) => a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name));
+      .sort((a, b) => a.lang.localeCompare(b.lang) || info.get(b).score - info.get(a).score || a.name.localeCompare(b.name));
     state.voices = it.concat(others);
 
     const saved = store.get('voice', null);
@@ -360,20 +400,27 @@
       g.label = label;
       list.forEach((v) => {
         const o = document.createElement('option');
+        const tag = info.get(v).tag;
         o.value = v.voiceURI || v.name;
-        o.textContent = v.name + ' (' + v.lang + ')';
+        o.textContent = (tag ? '★ ' : '') + v.name + ' (' + v.lang + ')' + (tag ? ' — ' + tag : '');
         g.appendChild(o);
       });
       el.voiceSelect.appendChild(g);
     };
-    addGroup('Voci italiane', it);
+    addGroup('Voci italiane (le migliori in alto)', it);
     addGroup('Altre lingue', others);
 
+    // Scelta automatica: la voce italiana di qualità più alta, se non ne hai scelta una tu.
     let chosen = state.voices.find((v) => (v.voiceURI || v.name) === saved);
-    if (!chosen) chosen = it.find((v) => v.default) || it.find((v) => v.lang === 'it-IT') || it[0] || all.find((v) => v.default) || all[0];
+    if (!chosen) chosen = it[0] || all.find((v) => v.default) || all[0];
     if (chosen) el.voiceSelect.value = chosen.voiceURI || chosen.name;
 
-    if (!it.length) setStatus('Nessuna voce italiana installata: scegline una in ⚙️ Voce.');
+    const bestTag = it.length ? info.get(it[0]).tag : '';
+    el.voiceTip.textContent = bestTag ? '' : voiceTip();
+    el.voiceTip.classList.toggle('hidden', !!bestTag);
+    el.btnSettings.textContent = bestTag || !it.length ? '⚙️ Voce' : '⚙️ Voce 💡';
+
+    if (!it.length) setStatus('Nessuna voce italiana installata: apri ⚙️ Voce per sapere come aggiungerla.');
   }
 
   function currentVoice() {

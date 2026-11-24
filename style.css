@@ -206,6 +206,14 @@ button { font: inherit; color: inherit; }
   margin-bottom: 10px;
   font-size: 0.95rem;
 }
+.voice-tip {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--highlight);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
 .hint { color: var(--muted); text-align: center; font-size: 0.9rem; }
 
 /* ---------- Pagine ---------- */
