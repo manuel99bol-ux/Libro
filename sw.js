@@ -1,9 +1,10 @@
 /* Service worker: rende l'app disponibile anche senza connessione. */
-const CACHE = 'libro-v2';
+const CACHE = 'libro-v3';
 const FILES = [
   './',
   'index.html',
   'style.css',
+  'editor.css',
   'app.js',
   'viewer.js',
   'manifest.webmanifest',

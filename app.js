@@ -54,7 +54,8 @@
   };
 
   // Modifiche al PDF: annotazioni, rotazioni ed eliminazioni per numero di pagina.
-  const emptyEdits = () => ({ ann: {}, rot: {}, del: {} });
+  // order: ordine delle pagine (chiavi), extra: pagine vuote o duplicate.
+  const emptyEdits = () => ({ ann: {}, rot: {}, del: {}, order: null, extra: {} });
 
   const events = new EventTarget();
   const emit = (name, detail) => events.dispatchEvent(new CustomEvent(name, { detail }));
@@ -510,7 +511,7 @@
 
   // ---------- API condivisa con viewer.js ----------
   const App = window.App = {
-    state, el, events, store, idb, edits: emptyEdits(),
+    state, el, events, store, idb, edits: emptyEdits(), emptyEdits,
     play, pause, resume, stop, togglePlay, goToPage, showView,
     saveEdits, showLoading, hideLoading, toast, loadScript,
   };
@@ -567,6 +568,7 @@
 
   document.addEventListener('keydown', (e) => {
     if (e.target.matches('input, select, textarea') || document.querySelector('dialog[open]')) return;
+    if (document.body.classList.contains('editor-mode')) return;
     if (e.code === 'Space' && state.pdf) { e.preventDefault(); togglePlay(); }
     else if (e.key === 'ArrowRight' && e.altKey) goToPage(state.page + 1);
     else if (e.key === 'ArrowLeft' && e.altKey) goToPage(state.page - 1);

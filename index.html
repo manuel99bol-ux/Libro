@@ -2,18 +2,19 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="theme-color" content="#1f4e79">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Libri">
-  <meta name="description" content="Legge ad alta voce i tuoi libri PDF, li mostra e ti permette di annotarli. Tutto sul tuo telefono.">
+  <meta name="description" content="Legge ad alta voce i tuoi libri PDF, li mostra e ti permette di modificarli. Tutto sul tuo telefono.">
   <title>Lettore di Libri</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="editor.css">
 </head>
 <body>
   <header class="topbar">
@@ -24,13 +25,185 @@
     </label>
   </header>
 
+  <!-- ===== Editor in stile elaboratore di testi (visibile solo in modifica) ===== -->
+  <div id="editorTop" class="editor-top">
+    <div class="ed-title">
+      <button id="edClose" class="ed-tbtn" data-icon="check" title="Chiudi la modifica"><span>Fine</span></button>
+      <button id="edUndo" class="ed-tbtn" data-icon="undo" title="Annulla (Ctrl+Z)" aria-label="Annulla"></button>
+      <button id="edRedo" class="ed-tbtn" data-icon="redo" title="Ripeti (Ctrl+Y)" aria-label="Ripeti"></button>
+      <div class="ed-name"><span id="edDocName">Documento</span><small id="edSaved">Salvato ✓</small></div>
+      <button id="edSave" class="ed-tbtn ed-save" data-icon="save" title="Salva come PDF (Ctrl+S)"><span>Salva PDF</span></button>
+    </div>
+
+    <div class="ribbon-tabs" role="tablist" aria-label="Schede della barra multifunzione">
+      <button class="rtab" role="tab" data-tab="file">File</button>
+      <button class="rtab active" role="tab" data-tab="home">Home</button>
+      <button class="rtab" role="tab" data-tab="insert">Inserisci</button>
+      <button class="rtab" role="tab" data-tab="draw">Disegno</button>
+      <button class="rtab" role="tab" data-tab="layout">Layout</button>
+      <button class="rtab" role="tab" data-tab="view">Visualizza</button>
+    </div>
+
+    <div id="ribbon" class="ribbon">
+      <!-- FILE -->
+      <div class="rpanel" data-panel="file" role="tabpanel">
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="save" data-icon="save"><span>Salva come PDF</span></button>
+          <button class="rb big" data-cmd="share" data-icon="share"><span>Condividi</span></button>
+          <button class="rb big" data-cmd="open" data-icon="folder"><span>Apri</span></button>
+        </div><div class="rg-label">Documento</div></div>
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="discard" data-icon="discard"><span>Annulla tutte le modifiche</span></button>
+          <button class="rb big" data-cmd="close" data-icon="check"><span>Chiudi modifica</span></button>
+        </div><div class="rg-label">Modifiche</div></div>
+      </div>
+
+      <!-- HOME -->
+      <div class="rpanel active" data-panel="home" role="tabpanel">
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="paste" data-icon="paste" title="Incolla (Ctrl+V)"><span>Incolla</span></button>
+          <div class="rcol">
+            <button class="rb" data-cmd="cut" data-icon="cut" title="Taglia (Ctrl+X)"><span>Taglia</span></button>
+            <button class="rb" data-cmd="copy" data-icon="copy" title="Copia (Ctrl+C)"><span>Copia</span></button>
+            <button class="rb" data-cmd="duplicate" data-icon="duplicate" title="Duplica (Ctrl+D)"><span>Duplica</span></button>
+          </div>
+        </div><div class="rg-label">Appunti</div></div>
+
+        <div class="rgroup"><div class="rg-body rcol">
+          <div class="rrow">
+            <select id="fFamily" class="rsel" title="Tipo di carattere" aria-label="Tipo di carattere">
+              <option value="sans">Arial</option>
+              <option value="serif">Times New Roman</option>
+              <option value="mono">Courier New</option>
+            </select>
+            <input id="fSize" class="rnum" type="number" min="4" max="200" step="0.5" list="fSizes" title="Dimensione carattere" aria-label="Dimensione carattere">
+            <datalist id="fSizes">
+              <option value="8"><option value="9"><option value="10"><option value="10.5"><option value="11"><option value="12">
+              <option value="14"><option value="16"><option value="18"><option value="20"><option value="22"><option value="24">
+              <option value="28"><option value="36"><option value="48"><option value="72">
+            </datalist>
+            <button class="rb sm" data-cmd="grow" title="Aumenta dimensione carattere">A<sup>▲</sup></button>
+            <button class="rb sm" data-cmd="shrink" title="Riduci dimensione carattere">A<sup>▼</sup></button>
+          </div>
+          <div class="rrow">
+            <button class="rb sm" data-cmd="bold" id="bBold" title="Grassetto (Ctrl+B)" aria-label="Grassetto"><b>G</b></button>
+            <button class="rb sm" data-cmd="italic" id="bItalic" title="Corsivo (Ctrl+I)" aria-label="Corsivo"><i style="font-family:serif">C</i></button>
+            <button class="rb sm" data-cmd="underline" id="bUnderline" title="Sottolineato (Ctrl+U)" aria-label="Sottolineato"><u>S</u></button>
+            <span class="rsplit">
+              <button class="rb sm" data-cmd="hlColor" title="Colore evidenziazione testo" aria-label="Evidenzia"><span class="ab">ab</span><i class="cbar" id="hlBar"></i></button>
+              <button class="rb drop" data-pop="hl" aria-label="Scegli il colore di evidenziazione">▾</button>
+            </span>
+            <span class="rsplit">
+              <button class="rb sm" data-cmd="fontColor" title="Colore carattere" aria-label="Colore carattere"><span class="fa">A</span><i class="cbar" id="fcBar"></i></button>
+              <button class="rb drop" data-pop="font" aria-label="Scegli il colore del carattere">▾</button>
+            </span>
+          </div>
+        </div><div class="rg-label">Carattere</div></div>
+
+        <div class="rgroup"><div class="rg-body rcol">
+          <div class="rrow">
+            <button class="rb sm" data-cmd="align" data-align="left" data-icon="alignL" title="Allinea a sinistra" aria-label="Allinea a sinistra"></button>
+            <button class="rb sm" data-cmd="align" data-align="center" data-icon="alignC" title="Centra" aria-label="Centra"></button>
+            <button class="rb sm" data-cmd="align" data-align="right" data-icon="alignR" title="Allinea a destra" aria-label="Allinea a destra"></button>
+            <button class="rb sm" data-cmd="align" data-align="justify" data-icon="alignJ" title="Giustifica" aria-label="Giustifica"></button>
+          </div>
+        </div><div class="rg-label">Paragrafo</div></div>
+
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="tool" data-tool="select" data-icon="select"><span>Seleziona</span></button>
+          <button class="rb big" data-cmd="delete" data-icon="trash" title="Elimina (Canc)"><span>Elimina</span></button>
+        </div><div class="rg-label">Modifica</div></div>
+      </div>
+
+      <!-- INSERISCI -->
+      <div class="rpanel" data-panel="insert" role="tabpanel">
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="tool" data-tool="textbox" data-icon="textbox"><span>Casella di testo</span></button>
+          <button class="rb big" data-cmd="image" data-icon="image"><span>Immagine</span></button>
+        </div><div class="rg-label">Testo e immagini</div></div>
+
+        <div class="rgroup"><div class="rg-body">
+          <div class="rcol">
+            <div class="rrow">
+              <button class="rb sm" data-cmd="tool" data-tool="rect" data-icon="rect" title="Rettangolo" aria-label="Rettangolo"></button>
+              <button class="rb sm" data-cmd="tool" data-tool="ellipse" data-icon="ellipse" title="Ovale" aria-label="Ovale"></button>
+              <button class="rb sm" data-cmd="tool" data-tool="line" data-icon="line" title="Linea" aria-label="Linea"></button>
+              <button class="rb sm" data-cmd="tool" data-tool="arrow" data-icon="arrow" title="Freccia" aria-label="Freccia"></button>
+            </div>
+            <div class="rrow">
+              <span class="rsplit">
+                <button class="rb sm" data-cmd="shapeStroke" data-icon="rect" title="Contorno forma" aria-label="Contorno forma"><i class="cbar" id="stBar"></i></button>
+                <button class="rb drop" data-pop="stroke" aria-label="Scegli il colore del contorno">▾</button>
+              </span>
+              <span class="rsplit">
+                <button class="rb sm" data-cmd="shapeFill" data-icon="bucket" title="Riempimento forma" aria-label="Riempimento forma"><i class="cbar" id="flBar"></i></button>
+                <button class="rb drop" data-pop="fill" aria-label="Scegli il colore di riempimento">▾</button>
+              </span>
+            </div>
+          </div>
+        </div><div class="rg-label">Forme</div></div>
+
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="blankPage" data-icon="pagePlus"><span>Pagina vuota</span></button>
+          <button class="rb big" data-cmd="dupPage" data-icon="duplicate"><span>Duplica pagina</span></button>
+        </div><div class="rg-label">Pagine</div></div>
+      </div>
+
+      <!-- DISEGNO -->
+      <div class="rpanel" data-panel="draw" role="tabpanel">
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="tool" data-tool="select" data-icon="select"><span>Seleziona</span></button>
+          <button class="rb big" data-cmd="tool" data-tool="pen" data-icon="pen"><span>Penna</span></button>
+          <button class="rb big" data-cmd="tool" data-tool="hl" data-icon="marker"><span>Evidenziatore</span></button>
+          <button class="rb big" data-cmd="tool" data-tool="eraser" data-icon="eraser"><span>Gomma</span></button>
+        </div><div class="rg-label">Strumenti</div></div>
+        <div class="rgroup"><div class="rg-body"><div id="inkSwatches" class="inkswatches"></div></div><div class="rg-label">Colore</div></div>
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="inkWidth" data-w="0"><span class="wline w0"></span><span>Sottile</span></button>
+          <button class="rb big" data-cmd="inkWidth" data-w="1"><span class="wline w1"></span><span>Medio</span></button>
+          <button class="rb big" data-cmd="inkWidth" data-w="2"><span class="wline w2"></span><span>Spesso</span></button>
+        </div><div class="rg-label">Spessore</div></div>
+      </div>
+
+      <!-- LAYOUT -->
+      <div class="rpanel" data-panel="layout" role="tabpanel">
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="rotL" data-icon="rotL"><span>Ruota a sinistra</span></button>
+          <button class="rb big" data-cmd="rotR" data-icon="rotR"><span>Ruota a destra</span></button>
+        </div><div class="rg-label">Orientamento</div></div>
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="moveUp" data-icon="up"><span>Sposta su</span></button>
+          <button class="rb big" data-cmd="moveDown" data-icon="down"><span>Sposta giù</span></button>
+        </div><div class="rg-label">Disponi</div></div>
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="blankPage" data-icon="pagePlus"><span>Pagina vuota</span></button>
+          <button class="rb big" data-cmd="dupPage" data-icon="duplicate"><span>Duplica</span></button>
+          <button class="rb big" data-cmd="delPage" data-icon="pageDel"><span>Elimina pagina</span></button>
+        </div><div class="rg-label">Pagine</div></div>
+      </div>
+
+      <!-- VISUALIZZA -->
+      <div class="rpanel" data-panel="view" role="tabpanel">
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="zoomOut" data-icon="zoomOut"><span>Riduci</span></button>
+          <button class="rb big" data-cmd="zoomIn" data-icon="zoomIn"><span>Ingrandisci</span></button>
+          <button class="rb big" data-cmd="fitWidth" data-icon="fitWidth"><span>Larghezza pagina</span></button>
+          <button class="rb big" data-cmd="fitPage" data-icon="fitPage"><span>Pagina intera</span></button>
+        </div><div class="rg-label">Zoom</div></div>
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="readMode" data-icon="headphones"><span>Ascolta</span></button>
+        </div><div class="rg-label">Lettura</div></div>
+      </div>
+    </div>
+  </div>
+
   <main id="views">
     <!-- Benvenuto -->
     <section id="welcome" class="view active">
       <div class="card welcome">
         <div class="welcome-icon">📖</div>
         <p class="big">Scegli un libro in formato PDF.</p>
-        <p>Puoi ascoltarlo, sfogliarlo e annotarlo. Il libro resta sul tuo telefono:
+        <p>Puoi ascoltarlo, sfogliarlo e modificarlo. Il libro resta sul tuo telefono:
            nessun dato viene inviato in rete.</p>
         <label class="btn btn-primary btn-large">
           📂 Scegli un PDF
@@ -81,7 +254,7 @@
       <p class="hint">Tocca una frase per iniziare a leggere da lì.</p>
     </section>
 
-    <!-- Pagine -->
+    <!-- Pagine / documento -->
     <section id="viewPages" class="view" aria-label="Pagine">
       <div id="pagesScroll" class="pages-scroll">
         <div id="pagesInner" class="pages-inner"></div>
@@ -89,9 +262,21 @@
     </section>
   </main>
 
-  <!-- Barra strumenti delle pagine (sopra la barra delle schede) -->
+  <!-- Barra di stato dell'editor -->
+  <div id="statusbar" class="statusbar">
+    <span id="sbPage">Pagina 1 di 1</span>
+    <span id="sbHint" class="sb-hint"></span>
+    <span class="sb-zoom">
+      <button id="sbZoomOut" type="button" aria-label="Riduci">−</button>
+      <input id="sbZoom" type="range" min="50" max="400" step="5" value="100" aria-label="Zoom">
+      <button id="sbZoomIn" type="button" aria-label="Ingrandisci">+</button>
+      <span id="sbZoomVal">100%</span>
+    </span>
+  </div>
+
+  <!-- Barra della scheda Pagine (fuori dalla modifica) -->
   <div id="pagesBar" class="pagesbar hidden">
-    <div id="viewTools" class="toolrow">
+    <div class="toolrow">
       <button id="zoomOut" class="tool" aria-label="Riduci">➖</button>
       <span id="zoomLabel" class="zoomlabel">100%</span>
       <button id="zoomIn" class="tool" aria-label="Ingrandisci">➕</button>
@@ -99,24 +284,7 @@
       <button id="miniPlay" class="tool" aria-label="Leggi">▶</button>
       <span id="miniInfo" class="mini-info">Pag. 1</span>
       <span class="sep"></span>
-      <button id="editToggle" class="tool tool-wide" aria-pressed="false">✏️<span>Modifica</span></button>
-    </div>
-
-    <div id="editTools" class="hidden">
-      <div class="toolrow">
-        <button class="tool tool-wide" data-tool="pan" aria-label="Scorri">✋<span>Scorri</span></button>
-        <button class="tool tool-wide" data-tool="pen" aria-label="Penna">🖊️<span>Penna</span></button>
-        <button class="tool tool-wide" data-tool="hl" aria-label="Evidenziatore">🖍️<span>Evidenzia</span></button>
-        <button class="tool tool-wide" data-tool="text" aria-label="Testo">🔤<span>Testo</span></button>
-        <button class="tool tool-wide" data-tool="eraser" aria-label="Gomma">🧽<span>Gomma</span></button>
-      </div>
-      <div class="toolrow">
-        <div id="swatches" class="swatches" role="radiogroup" aria-label="Colore"></div>
-        <span class="sep"></span>
-        <button id="undoBtn" class="tool" aria-label="Annulla l'ultima modifica">↶</button>
-        <button id="saveBtn" class="tool tool-primary" aria-label="Salva il PDF">💾</button>
-        <button id="editDone" class="tool tool-wide" aria-label="Fine modifica">✔<span>Fine</span></button>
-      </div>
+      <button id="editToggle" class="tool tool-wide tool-primary">✏️<span>Modifica</span></button>
     </div>
   </div>
 
@@ -125,27 +293,8 @@
     <button class="tab" data-view="viewPages">📄<span>Pagine</span></button>
   </nav>
 
-  <!-- Finestra per aggiungere / modificare un testo -->
-  <dialog id="textDialog" class="sheet">
-    <form method="dialog">
-      <h2 id="textDialogTitle">Aggiungi testo</h2>
-      <textarea id="textValue" rows="3" placeholder="Scrivi qui…"></textarea>
-      <div class="field">
-        <label for="textSize">Dimensione</label>
-        <select id="textSize">
-          <option value="10">Piccola</option>
-          <option value="16" selected>Media</option>
-          <option value="24">Grande</option>
-          <option value="36">Molto grande</option>
-        </select>
-      </div>
-      <div class="dialog-buttons">
-        <button value="delete" id="textDelete" class="btn btn-danger hidden">Elimina</button>
-        <button value="cancel" class="btn">Annulla</button>
-        <button value="ok" class="btn btn-primary">OK</button>
-      </div>
-    </form>
-  </dialog>
+  <div id="palette" class="palette hidden" role="dialog" aria-label="Colori"></div>
+  <input id="imgInput" type="file" accept="image/*" hidden>
 
   <!-- Finestra di salvataggio -->
   <dialog id="saveDialog" class="sheet">

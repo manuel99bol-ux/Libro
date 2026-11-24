@@ -18,11 +18,31 @@ Si può installare sulla schermata Home e funziona anche offline.
 - Zoom con ➖ ➕ o col pizzico a due dita.
 - 🔊 «Leggi» su ogni pagina per far partire la voce da lì; il mini-lettore in basso mette in pausa.
 
-**✏️ Modifica** (dalla scheda Pagine)
-- 🖊️ Penna, 🖍️ Evidenziatore, 🔤 Testo (tocca la pagina per scrivere, tocca un testo per cambiarlo o eliminarlo), 🧽 Gomma.
-- ↻ Ruota ed 🗑 Elimina pagina (si possono ripristinare), ↶ Annulla.
-- Le modifiche si salvano da sole sul telefono.
-- 💾 crea un nuovo PDF «… (modificato).pdf» da scaricare o condividere. L'originale non viene toccato.
+**✏️ Modifica** (dalla scheda Pagine) — un editor con barra multifunzione in stile elaboratore di testi
+- **Barra del titolo**: Fine, Annulla, Ripeti, nome del documento, «Salva PDF».
+- **File**: salva come PDF, condividi, apri, annulla tutte le modifiche.
+- **Home**: incolla, taglia, copia, duplica; carattere (Arial, Times New Roman, Courier New), dimensione,
+  A▲ A▼, **G**rassetto, *C*orsivo, <u>S</u>ottolineato, evidenziazione, colore; allineamento
+  (sinistra, centro, destra, giustificato); seleziona, elimina.
+- **Inserisci**: casella di testo, immagine (dal telefono o dalla fotocamera), forme (rettangolo, ovale,
+  linea, freccia) con contorno e riempimento, pagina vuota, duplica pagina.
+- **Disegno**: penna, evidenziatore, gomma, colori e spessori.
+- **Layout**: ruota a sinistra/destra, sposta su/giù, pagina vuota, duplica, elimina pagina.
+- **Visualizza**: zoom, larghezza pagina, pagina intera, passa all'ascolto.
+- **Barra di stato**: «Pagina X di Y», suggerimenti e cursore dello zoom.
+
+**Modificare il testo del PDF**: con «Seleziona» tocca una riga del documento. Diventa modificabile sul posto,
+con carattere, dimensione e colore simili all'originale. Il testo originale viene coperto con il colore di
+sfondo della pagina e il nuovo testo è scritto sopra. Tocca fuori per confermare; se non cambi nulla
+la pagina resta com'era.
+
+Gli elementi aggiunti si toccano per selezionarli, si trascinano per spostarli e si ridimensionano con
+la maniglia rotonda. Un secondo tocco su una casella di testo la rimette in modifica. Con due dita si
+scorre e si ingrandisce anche mentre si disegna. Le modifiche si salvano da sole sul telefono.
+
+**Salva PDF** crea «… (modificato).pdf» con tutte le modifiche (anche ordine, rotazione ed eliminazione
+delle pagine), da scaricare o condividere. L'originale non viene toccato e il file esportato si può
+riaprire nell'app e modificare di nuovo.
 
 ## Come avviarla
 
@@ -42,7 +62,10 @@ Fai doppio clic su `index.html`. Oppure, in un terminale nella cartella:
 - Le voci dipendono dal sistema. Su Android se ne installano altre da *Impostazioni → Sintesi vocale*,
   su iPhone da *Impostazioni → Accessibilità → Contenuti letti ad alta voce → Voci*.
 - I PDF scansionati (solo immagini) si vedono e si annotano, ma non si possono leggere ad alta voce.
-- Il testo già presente nel PDF non si può riscrivere: si possono aggiungere testi, disegni ed evidenziazioni.
+- Il testo originale modificato viene coperto, non cancellato: nel PDF esportato non si vede più, ma un
+  programma che estrae il testo (o un «copia e incolla» da quella zona) può ancora trovarlo.
+- Se una riga è su uno sfondo sfumato o su un'immagine, la copertura usa un solo colore e può notarsi.
+- I caratteri disponibili sono i tre standard del PDF (simili ad Arial, Times New Roman e Courier New).
 - Nei testi aggiunti si possono usare lettere accentate e la punteggiatura comune; simboli speciali
   ed emoji diventano «?» nel PDF salvato.
 
