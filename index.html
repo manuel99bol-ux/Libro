@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#1f4e79">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Libri">
+  <meta name="description" content="Legge ad alta voce i tuoi libri PDF, li mostra e ti permette di modificarli. Tutto sul tuo telefono.">
+  <title>Lettore di Libri</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+  <header class="topbar hero">
+    <svg class="hero-art" viewBox="0 0 400 160" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="heroSky" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#1e9bff"/>
+          <stop offset="1" stop-color="#0b5ce6"/>
+        </linearGradient>
+      </defs>
+      <rect width="400" height="160" fill="url(#heroSky)"/>
+      <path d="M0 78 C55 64 92 104 150 98 C215 92 240 52 300 60 C345 66 372 96 400 92 V160 H0 Z" fill="#0a52d8" opacity=".55"/>
+      <path d="M0 104 C40 88 92 82 140 92 C182 101 200 128 246 132 C300 136 340 112 400 120 V160 H0 Z" fill="#1aa8ff" opacity=".45"/>
+      <path d="M0 132 C60 118 110 150 170 146 C230 142 250 118 300 124 V160 H0 Z" fill="#0b4fd0" opacity=".5"/>
+      <path d="M232 0 C246 58 300 92 362 88 C380 87 392 82 400 78 V0 Z" fill="#ffbf1f"/>
+      <g class="sparks" stroke="#fff" stroke-width="8" stroke-linecap="round" fill="none">
+        <path d="M20 84 L44 96"/><path d="M48 52 L62 76"/><path d="M84 42 L84 66"/>
+      </g>
+    </svg>
+    <div class="hero-row">
+      <h1 id="appTitle">Lettore di Libri</h1>
+      <label class="hero-open" aria-label="Apri un PDF">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2h8.8A1.5 1.5 0 0 1 21 8.5V9H3z" fill="#ffffff"/><path d="M2.2 10.2A1 1 0 0 1 3.2 9h17.6a1 1 0 0 1 1 1.2l-1.5 8.2a1.5 1.5 0 0 1-1.5 1.2H4.9a1.5 1.5 0 0 1-1.5-1.2z" fill="#d9e9ff"/></svg>
+        <span>Apri</span>
+        <input id="fileInput" type="file" accept="application/pdf,.pdf" hidden>
+      </label>
+    </div>
+  </header>
+
+  <!-- ===== Editor in stile elaboratore di testi (visibile solo in modifica) ===== -->
+  <div id="editorTop" class="editor-top">
+    <div class="ed-title">
+      <button id="edClose" class="ed-tbtn" data-icon="check" title="Chiudi la modifica"><span>Fine</span></button>
+      <button id="edUndo" class="ed-tbtn" data-icon="undo" title="Annulla (Ctrl+Z)" aria-label="Annulla"></button>
+      <button id="edRedo" class="ed-tbtn" data-icon="redo" title="Ripeti (Ctrl+Y)" aria-label="Ripeti"></button>
+      <div class="ed-name"><span id="edDocName">Documento</span><small id="edSaved">Salvato ✓</small></div>
+      <button id="edSave" class="ed-tbtn ed-save" data-icon="save" title="Salva come PDF (Ctrl+S)"><span>Salva PDF</span></button>
+    </div>
+
+    <div class="ribbon-tabs" role="tablist" aria-label="Schede della barra multifunzione">
+      <button class="rtab" role="tab" data-tab="file">File</button>
+      <button class="rtab active" role="tab" data-tab="home">Home</button>
+      <button class="rtab" role="tab" data-tab="insert">Inserisci</button>
+      <button class="rtab" role="tab" data-tab="draw">Disegno</button>
+      <button class="rtab" role="tab" data-tab="layout">Layout</button>
+      <button class="rtab" role="tab" data-tab="view">Visualizza</button>
+    </div>
+
+    <div id="ribbon" class="ribbon">
+      <!-- FILE -->
+      <div class="rpanel" data-panel="file" role="tabpanel">
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="save" data-icon="save"><span>Salva come PDF</span></button>
+          <button class="rb big" data-cmd="share" data-icon="share"><span>Condividi</span></button>
+          <button class="rb big" data-cmd="open" data-icon="folder"><span>Apri</span></button>
+        </div><div class="rg-label">Documento</div></div>
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="discard" data-icon="discard"><span>Annulla tutte le modifiche</span></button>
+          <button class="rb big" data-cmd="close" data-icon="check"><span>Chiudi modifica</span></button>
+        </div><div class="rg-label">Modifiche</div></div>
+      </div>
+
+      <!-- HOME -->
+      <div class="rpanel active" data-panel="home" role="tabpanel">
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="paste" data-icon="paste" title="Incolla (Ctrl+V)"><span>Incolla</span></button>
+          <div class="rcol">
+            <button class="rb" data-cmd="cut" data-icon="cut" title="Taglia (Ctrl+X)"><span>Taglia</span></button>
+            <button class="rb" data-cmd="copy" data-icon="copy" title="Copia (Ctrl+C)"><span>Copia</span></button>
+            <button class="rb" data-cmd="duplicate" data-icon="duplicate" title="Duplica (Ctrl+D)"><span>Duplica</span></button>
+          </div>
+        </div><div class="rg-label">Appunti</div></div>
+
+        <div class="rgroup"><div class="rg-body rcol">
+          <div class="rrow">
+            <select id="fFamily" class="rsel" title="Tipo di carattere" aria-label="Tipo di carattere">
+              <option value="sans">Arial</option>
+              <option value="serif">Times New Roman</option>
+              <option value="mono">Courier New</option>
+            </select>
+            <input id="fSize" class="rnum" type="number" min="4" max="200" step="0.5" list="fSizes" title="Dimensione carattere" aria-label="Dimensione carattere">
+            <datalist id="fSizes">
+              <option value="8"><option value="9"><option value="10"><option value="10.5"><option value="11"><option value="12">
+              <option value="14"><option value="16"><option value="18"><option value="20"><option value="22"><option value="24">
+              <option value="28"><option value="36"><option value="48"><option value="72">
+            </datalist>
+            <button class="rb sm" data-cmd="grow" title="Aumenta dimensione carattere">A<sup>▲</sup></button>
+            <button class="rb sm" data-cmd="shrink" title="Riduci dimensione carattere">A<sup>▼</sup></button>
+          </div>
+          <div class="rrow">
+            <button class="rb sm" data-cmd="bold" id="bBold" title="Grassetto (Ctrl+B)" aria-label="Grassetto"><b>G</b></button>
+            <button class="rb sm" data-cmd="italic" id="bItalic" title="Corsivo (Ctrl+I)" aria-label="Corsivo"><i style="font-family:serif">C</i></button>
+            <button class="rb sm" data-cmd="underline" id="bUnderline" title="Sottolineato (Ctrl+U)" aria-label="Sottolineato"><u>S</u></button>
+            <span class="rsplit">
+              <button class="rb sm" data-cmd="hlColor" title="Colore evidenziazione testo" aria-label="Evidenzia"><span class="ab">ab</span><i class="cbar" id="hlBar"></i></button>
+              <button class="rb drop" data-pop="hl" aria-label="Scegli il colore di evidenziazione">▾</button>
+            </span>
+            <span class="rsplit">
+              <button class="rb sm" data-cmd="fontColor" title="Colore carattere" aria-label="Colore carattere"><span class="fa">A</span><i class="cbar" id="fcBar"></i></button>
+              <button class="rb drop" data-pop="font" aria-label="Scegli il colore del carattere">▾</button>
+            </span>
+          </div>
+        </div><div class="rg-label">Carattere</div></div>
+
+        <div class="rgroup"><div class="rg-body rcol">
+          <div class="rrow">
+            <button class="rb sm" data-cmd="align" data-align="left" data-icon="alignL" title="Allinea a sinistra" aria-label="Allinea a sinistra"></button>
+            <button class="rb sm" data-cmd="align" data-align="center" data-icon="alignC" title="Centra" aria-label="Centra"></button>
+            <button class="rb sm" data-cmd="align" data-align="right" data-icon="alignR" title="Allinea a destra" aria-label="Allinea a destra"></button>
+            <button class="rb sm" data-cmd="align" data-align="justify" data-icon="alignJ" title="Giustifica" aria-label="Giustifica"></button>
+          </div>
+        </div><div class="rg-label">Paragrafo</div></div>
+
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="tool" data-tool="select" data-icon="select"><span>Seleziona</span></button>
+          <button class="rb big" data-cmd="delete" data-icon="trash" title="Elimina (Canc)"><span>Elimina</span></button>
+        </div><div class="rg-label">Modifica</div></div>
+      </div>
+
+      <!-- INSERISCI -->
+      <div class="rpanel" data-panel="insert" role="tabpanel">
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="tool" data-tool="textbox" data-icon="textbox"><span>Casella di testo</span></button>
+          <button class="rb big" data-cmd="image" data-icon="image"><span>Immagine</span></button>
+        </div><div class="rg-label">Testo e immagini</div></div>
+
+        <div class="rgroup"><div class="rg-body">
+          <div class="rcol">
+            <div class="rrow">
+              <button class="rb sm" data-cmd="tool" data-tool="rect" data-icon="rect" title="Rettangolo" aria-label="Rettangolo"></button>
+              <button class="rb sm" data-cmd="tool" data-tool="ellipse" data-icon="ellipse" title="Ovale" aria-label="Ovale"></button>
+              <button class="rb sm" data-cmd="tool" data-tool="line" data-icon="line" title="Linea" aria-label="Linea"></button>
+              <button class="rb sm" data-cmd="tool" data-tool="arrow" data-icon="arrow" title="Freccia" aria-label="Freccia"></button>
+            </div>
+            <div class="rrow">
+              <span class="rsplit">
+                <button class="rb sm" data-cmd="shapeStroke" data-icon="rect" title="Contorno forma" aria-label="Contorno forma"><i class="cbar" id="stBar"></i></button>
+                <button class="rb drop" data-pop="stroke" aria-label="Scegli il colore del contorno">▾</button>
+              </span>
+              <span class="rsplit">
+                <button class="rb sm" data-cmd="shapeFill" data-icon="bucket" title="Riempimento forma" aria-label="Riempimento forma"><i class="cbar" id="flBar"></i></button>
+                <button class="rb drop" data-pop="fill" aria-label="Scegli il colore di riempimento">▾</button>
+              </span>
+            </div>
+          </div>
+        </div><div class="rg-label">Forme</div></div>
+
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="blankPage" data-icon="pagePlus"><span>Pagina vuota</span></button>
+          <button class="rb big" data-cmd="dupPage" data-icon="duplicate"><span>Duplica pagina</span></button>
+        </div><div class="rg-label">Pagine</div></div>
+      </div>
+
+      <!-- DISEGNO -->
+      <div class="rpanel" data-panel="draw" role="tabpanel">
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="tool" data-tool="select" data-icon="select"><span>Seleziona</span></button>
+          <button class="rb big" data-cmd="tool" data-tool="pen" data-icon="pen"><span>Penna</span></button>
+          <button class="rb big" data-cmd="tool" data-tool="hl" data-icon="marker"><span>Evidenziatore</span></button>
+          <button class="rb big" data-cmd="tool" data-tool="eraser" data-icon="eraser"><span>Gomma</span></button>
+        </div><div class="rg-label">Strumenti</div></div>
+        <div class="rgroup"><div class="rg-body"><div id="inkSwatches" class="inkswatches"></div></div><div class="rg-label">Colore</div></div>
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="inkWidth" data-w="0"><span class="wline w0"></span><span>Sottile</span></button>
+          <button class="rb big" data-cmd="inkWidth" data-w="1"><span class="wline w1"></span><span>Medio</span></button>
+          <button class="rb big" data-cmd="inkWidth" data-w="2"><span class="wline w2"></span><span>Spesso</span></button>
+        </div><div class="rg-label">Spessore</div></div>
+      </div>
+
+      <!-- LAYOUT -->
+      <div class="rpanel" data-panel="layout" role="tabpanel">
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="rotL" data-icon="rotL"><span>Ruota a sinistra</span></button>
+          <button class="rb big" data-cmd="rotR" data-icon="rotR"><span>Ruota a destra</span></button>
+        </div><div class="rg-label">Orientamento</div></div>
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="moveUp" data-icon="up"><span>Sposta su</span></button>
+          <button class="rb big" data-cmd="moveDown" data-icon="down"><span>Sposta giù</span></button>
+        </div><div class="rg-label">Disponi</div></div>
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="blankPage" data-icon="pagePlus"><span>Pagina vuota</span></button>
+          <button class="rb big" data-cmd="dupPage" data-icon="duplicate"><span>Duplica</span></button>
+          <button class="rb big" data-cmd="delPage" data-icon="pageDel"><span>Elimina pagina</span></button>
+        </div><div class="rg-label">Pagine</div></div>
+      </div>
+
+      <!-- VISUALIZZA -->
+      <div class="rpanel" data-panel="view" role="tabpanel">
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="zoomOut" data-icon="zoomOut"><span>Riduci</span></button>
+          <button class="rb big" data-cmd="zoomIn" data-icon="zoomIn"><span>Ingrandisci</span></button>
+          <button class="rb big" data-cmd="fitWidth" data-icon="fitWidth"><span>Larghezza pagina</span></button>
+          <button class="rb big" data-cmd="fitPage" data-icon="fitPage"><span>Pagina intera</span></button>
+        </div><div class="rg-label">Zoom</div></div>
+        <div class="rgroup"><div class="rg-body">
+          <button class="rb big" data-cmd="readMode" data-icon="headphones"><span>Ascolta</span></button>
+        </div><div class="rg-label">Lettura</div></div>
+      </div>
+    </div>
+  </div>
+
+  <main id="views">
+    <!-- Benvenuto -->
+    <section id="welcome" class="view active">
+      <div class="card welcome">
+        <div class="welcome-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 6.5C10 5 7.5 4.5 4 4.8v13.4c3.5-.3 6 .2 8 1.8 2-1.6 4.5-2.1 8-1.8V4.8c-3.5-.3-6 .2-8 1.7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 6.5V20" stroke="currentColor" stroke-width="1.8"/></svg>
+        </div>
+        <p class="big">Scegli un libro in formato PDF.</p>
+        <p>Puoi ascoltarlo, sfogliarlo e modificarlo. Il libro resta sul tuo telefono:
+           nessun dato viene inviato in rete.</p>
+        <label class="btn btn-primary btn-large">
+          Scegli un PDF
+          <input id="fileInput2" type="file" accept="application/pdf,.pdf" hidden>
+        </label>
+        <p id="installHint" class="hint hidden"></p>
+      </div>
+    </section>
+
+    <!-- Ascolta -->
+    <section id="viewListen" class="view" aria-label="Ascolta">
+      <div class="controls">
+        <div class="row main-buttons">
+          <button id="btnPrev" class="btn cbtn" aria-label="Pagina precedente"><span class="cico ico-purple"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 7.2v9.6a.8.8 0 0 1-1.25.66L3.6 12.66a.8.8 0 0 1 0-1.32l6.15-4.8A.8.8 0 0 1 11 7.2zm9 0v9.6a.8.8 0 0 1-1.25.66l-6.15-4.8a.8.8 0 0 1 0-1.32l6.15-4.8A.8.8 0 0 1 20 7.2z" fill="currentColor"/></svg></span><span class="clbl">Pag. prec.</span></button>
+          <button id="btnPlay" class="btn cbtn cbtn-primary" aria-label="Leggi"><span class="cico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg></span><span class="clbl">Leggi</span></button>
+          <button id="btnPause" class="btn cbtn cbtn-primary hidden" aria-label="Pausa"><span class="cico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="5" width="4" height="14" rx="1.3" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1.3" fill="currentColor"/></svg></span><span class="clbl">Pausa</span></button>
+          <button id="btnResume" class="btn cbtn cbtn-primary hidden" aria-label="Riprendi"><span class="cico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg></span><span class="clbl">Riprendi</span></button>
+          <button id="btnStop" class="btn cbtn cbtn-stop" aria-label="Stop"><span class="cico ico-red"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/></svg></span><span class="clbl">Stop</span></button>
+          <button id="btnNext" class="btn cbtn" aria-label="Pagina successiva"><span class="cico ico-green"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 7.2v9.6a.8.8 0 0 0 1.25.66l6.15-4.8a.8.8 0 0 0 0-1.32l-6.15-4.8A.8.8 0 0 0 13 7.2zm-9 0v9.6a.8.8 0 0 0 1.25.66l6.15-4.8a.8.8 0 0 0 0-1.32L5.25 6.54A.8.8 0 0 0 4 7.2z" fill="currentColor"/></svg></span><span class="clbl">Pag. succ.</span></button>
+        </div>
+        <div class="row pagenav">
+          <label for="pageInput">Pagina</label>
+          <input id="pageInput" type="number" min="1" value="1" inputmode="numeric">
+          <span>di <span id="pageCount">–</span></span>
+          <button id="btnSettings" class="chip voice-chip" aria-expanded="false" aria-controls="settings">
+            <svg class="mic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="3" width="7" height="12" rx="3.5" fill="#1c7cf4"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0" fill="none" stroke="#1c7cf4" stroke-width="1.8" stroke-linecap="round"/><path d="M12 17.5V21" stroke="#1c7cf4" stroke-width="1.8" stroke-linecap="round"/><path d="M2.5 9v3M21.5 9v3" stroke="#7cc4ff" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <span class="chip-label">Voce</span><span class="spark" aria-hidden="true">✨</span>
+            <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div class="statusrow"><span id="status" class="status" aria-live="polite"></span></div>
+      </div>
+
+      <div id="deletedNote" class="note hidden">Questa pagina è segnata come eliminata nelle modifiche.</div>
+      <article id="pageText" class="card pagetext" aria-label="Testo della pagina"></article>
+      <p class="hint">Tocca una frase per iniziare a leggere da lì.</p>
+    </section>
+
+    <!-- Pagine / documento -->
+    <section id="viewPages" class="view" aria-label="Pagine">
+      <div id="pagesScroll" class="pages-scroll">
+        <div id="pagesInner" class="pages-inner"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="settingsBackdrop" class="sheet-backdrop hidden"></div>
+  <div id="settings" class="settings-sheet hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="sheet-grab" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="settingsTitle">Voce e lettura</h2>
+      <button id="settingsClose" class="sheet-close" type="button" aria-label="Chiudi">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body">
+          <div id="neuralBox" class="neural-box hidden">
+            <div class="neural-head">✨ <strong>Voci naturali</strong></div>
+            <p class="neural-text">Voci italiane neurali che lavorano direttamente sul telefono, anche senza internet.
+              Ognuna si scarica una volta sola (meglio con il Wi-Fi).</p>
+            <div class="nv" data-voice="neural:paola">
+              <div class="nv-info"><strong>Paola</strong><span>Calma e scorrevole · legge subito</span></div>
+              <button class="btn nv-demo" type="button" data-sample="voices/samples/paola.wav" aria-label="Ascolta un esempio di Paola">▶ Esempio</button>
+              <button class="btn nv-btn" type="button">Scarica</button>
+            </div>
+            <div class="nv" data-voice="neural:sara">
+              <div class="nv-info"><strong>Sara</strong><span>La più espressiva · prepara l'audio in anticipo</span></div>
+              <button class="btn nv-demo" type="button" data-sample="voices/samples/sara.wav" aria-label="Ascolta un esempio di Sara">▶ Esempio</button>
+              <button class="btn nv-btn" type="button">Scarica</button>
+            </div>
+            <progress id="neuralProg" class="neural-prog hidden" max="100" value="0"></progress>
+            <p id="neuralMsg" class="neural-msg" aria-live="polite"></p>
+            <label id="paolaStyleRow" class="neural-style hidden" for="neuralStyle">Stile di Paola
+              <select id="neuralStyle">
+                <option value="calma">Calma (consigliato)</option>
+                <option value="naturale">Naturale</option>
+                <option value="espressiva">Espressiva</option>
+                <option value="originale">Originale del modello</option>
+              </select>
+            </label>
+            <div id="saraPrep" class="sara-prep hidden">
+              <p id="saraPrepInfo" class="neural-msg"></p>
+              <div class="sara-row">
+                <select id="saraPages" aria-label="Quante pagine preparare">
+                  <option value="3">3 pagine</option>
+                  <option value="10" selected>10 pagine</option>
+                  <option value="30">30 pagine</option>
+                  <option value="100">100 pagine</option>
+                </select>
+                <button id="saraPrepBtn" class="btn btn-primary" type="button">Prepara in anticipo</button>
+              </div>
+            </div>
+          </div>
+          <div id="azureBox" class="neural-box azure-box">
+            <div class="neural-head">☁️ <strong>Voce premium (Microsoft Azure)</strong></div>
+            <p class="neural-text">Le voci più naturali, simili a quelle degli assistenti AI. Servono internet e una chiave
+              <strong>gratuita</strong> di Azure (piano F0): se la quota gratuita del mese finisce, l'app passa da sola a un'altra voce, senza costi.</p>
+            <div id="azForm">
+              <label class="field" for="azKey">Chiave (KEY 1)
+                <input id="azKey" class="az-input" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Incolla qui la chiave">
+              </label>
+              <label class="field" for="azRegion">Area (Location / Region)
+                <select id="azRegion">
+                  <option value="westeurope">Europa occidentale (West Europe)</option>
+                  <option value="italynorth">Italia settentrionale (Italy North)</option>
+                  <option value="northeurope">Europa settentrionale (North Europe)</option>
+                  <option value="francecentral">Francia (France Central)</option>
+                  <option value="germanywestcentral">Germania (Germany West Central)</option>
+                  <option value="switzerlandnorth">Svizzera (Switzerland North)</option>
+                  <option value="swedencentral">Svezia (Sweden Central)</option>
+                  <option value="uksouth">Regno Unito (UK South)</option>
+                  <option value="eastus">Stati Uniti est (East US)</option>
+                  <option value="westus2">Stati Uniti ovest (West US 2)</option>
+                </select>
+              </label>
+              <button id="azConnect" class="btn btn-primary az-wide" type="button">Collega Azure</button>
+              <details class="az-help">
+                <summary>Come ottengo la chiave gratuita?</summary>
+                <ol>
+                  <li>Apri <strong>portal.azure.com</strong> e crea un account gratuito (la carta serve solo come verifica).</li>
+                  <li>In alto cerca <strong>«Servizi di riconoscimento vocale»</strong> (in inglese «Speech services») e premi <strong>Crea</strong>.</li>
+                  <li>Piano tariffario: scegli <strong>Free F0</strong>. Area: <strong>West Europe</strong> (o un'altra vicina). Nome: quello che vuoi.</li>
+                  <li>Finita la creazione, apri la risorsa e poi <strong>«Chiavi ed endpoint»</strong>: copia <strong>KEY 1</strong> e guarda la <strong>Location/Region</strong>.</li>
+                  <li>Incolla qui la chiave, scegli la stessa area e premi <strong>Collega Azure</strong>.</li>
+                </ol>
+                <p>Con il piano F0 non paghi mai: al limite mensile il servizio si ferma. La chiave resta solo su questo dispositivo.</p>
+              </details>
+            </div>
+            <div id="azConnected" class="hidden">
+              <label class="field" for="azVoice">Voce Azure
+                <select id="azVoice"></select>
+              </label>
+              <div class="sara-row">
+                <button id="azTry" class="btn" type="button">▶ Prova</button>
+                <button id="azUse" class="btn btn-primary" type="button">Usa questa voce</button>
+              </div>
+              <button id="azDisconnect" class="az-link" type="button">Scollega Azure da questo dispositivo</button>
+            </div>
+            <p id="azMsg" class="neural-msg" aria-live="polite"></p>
+          </div>
+          <div class="field">
+            <label for="voiceSelect">Voce</label>
+            <select id="voiceSelect"></select>
+            <p id="voiceTip" class="voice-tip hidden"></p>
+          </div>
+          <div class="field">
+            <label for="rateInput">Velocità: <strong id="rateValue">1.0×</strong></label>
+            <input id="rateInput" type="range" min="0.5" max="2" step="0.1" value="1">
+          </div>
+          <div class="field">
+            <label for="fontInput">Dimensione testo</label>
+            <input id="fontInput" type="range" min="14" max="32" step="1" value="19">
+          </div>
+    </div>
+  </div>
+
+  <!-- Barra di stato dell'editor -->
+  <div id="statusbar" class="statusbar">
+    <span id="sbPage">Pagina 1 di 1</span>
+    <span id="sbHint" class="sb-hint"></span>
+    <span class="sb-zoom">
+      <button id="sbZoomOut" type="button" aria-label="Riduci">−</button>
+      <input id="sbZoom" type="range" min="50" max="400" step="5" value="100" aria-label="Zoom">
+      <button id="sbZoomIn" type="button" aria-label="Ingrandisci">+</button>
+      <span id="sbZoomVal">100%</span>
+    </span>
+  </div>
+
+  <!-- Barra della scheda Pagine (fuori dalla modifica) -->
+  <div id="pagesBar" class="pagesbar hidden">
+    <div class="toolrow">
+      <button id="zoomOut" class="tool" aria-label="Riduci">➖</button>
+      <span id="zoomLabel" class="zoomlabel">100%</span>
+      <button id="zoomIn" class="tool" aria-label="Ingrandisci">➕</button>
+      <span class="sep"></span>
+      <button id="miniPlay" class="tool" aria-label="Leggi">▶</button>
+      <span id="miniInfo" class="mini-info">Pag. 1</span>
+      <span class="sep"></span>
+      <button id="editToggle" class="tool tool-wide tool-primary">✏️<span>Modifica</span></button>
+    </div>
+  </div>
+
+  <nav id="tabbar" class="tabbar hidden" aria-label="Sezioni">
+    <span class="blob blob-green" aria-hidden="true"></span>
+    <span class="blob blob-pink" aria-hidden="true"></span>
+    <button class="tab" data-view="viewListen">
+      <span class="tab-pill">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><rect x="3" y="13.5" width="5" height="7.5" rx="2" fill="currentColor"/><rect x="16" y="13.5" width="5" height="7.5" rx="2" fill="currentColor"/></svg>
+        <span class="tab-lbl">Ascolta</span>
+      </span>
+    </button>
+    <button class="tab" data-view="viewPages">
+      <span class="tab-pill">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.2L19 7.3V20a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 20V4A1.5 1.5 0 0 1 6 2.5z" fill="currentColor" opacity=".85"/><path d="M14 2.5V7.5h5" fill="#fff" opacity=".6"/><path d="M8 11h8M8 14h8M8 17h5" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span class="tab-lbl">Pagine</span>
+      </span>
+    </button>
+  </nav>
+
+  <div id="palette" class="palette hidden" role="dialog" aria-label="Colori"></div>
+  <input id="imgInput" type="file" accept="image/*" hidden>
+
+  <!-- Finestra di salvataggio -->
+  <dialog id="saveDialog" class="sheet">
+    <form method="dialog">
+      <h2>PDF pronto</h2>
+      <p id="saveInfo"></p>
+      <div class="dialog-buttons">
+        <button value="cancel" class="btn">Chiudi</button>
+        <button value="share" id="shareBtn" class="btn hidden">📤 Condividi</button>
+        <button value="download" class="btn btn-primary">⬇️ Scarica</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="loading" class="loading hidden" role="status"><span id="loadingText">Caricamento…</span></div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <script src="lib/pdf.min.js"></script>
+  <script src="tts-neural.js"></script>
+  <script src="app.js"></script>
+  <script src="viewer.js"></script>
+</body>
+</html>

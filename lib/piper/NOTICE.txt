@@ -1,0 +1,13 @@
+Componenti delle voci naturali «Paola» e «Sara»
+
+- piper_phonemize (WebAssembly) — da @diffusionstudio/piper-wasm 1.0.0, basato su
+  rhasspy/piper-phonemize (MIT) ed espeak-ng (GPL-3.0-or-later).
+  I dati di espeak-ng sono stati ridotti alle sole lingue italiana e inglese.
+  Sorgenti: https://github.com/rhasspy/piper-phonemize , https://github.com/espeak-ng/espeak-ng
+- ../voice-worker.js — scritto per questa app.
+- ../ort/ — onnxruntime-web 1.22.0 (MIT, Microsoft): https://github.com/microsoft/onnxruntime
+- ../../voices/paola/ — modello Piper «it_IT-paola-medium» (rhasspy/piper-voices),
+  addestrato sul dataset paolapersico1/Voice-Dataset-Italian (CC0-1.0).
+- ../../voices/sara/ — modello Kokoro-82M v1.0 (hexgrad, Apache-2.0), versione ONNX
+  quantizzata di onnx-community/Kokoro-82M-v1.0-ONNX, con la voce «if_sara».
+I modelli sono divisi in parti da 14 MB, riunite dal worker al primo avvio.
