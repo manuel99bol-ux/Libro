@@ -4,10 +4,12 @@
   'use strict';
 
   const BASE = 'voices/paola/';
-  const MODEL_PARTS = [0, 1, 2, 3, 4].map((i) => BASE + 'it_IT-paola-medium.onnx.part' + i);
+  // Alcuni hosting servono solo certi tipi di file: lì i file binari hanno un suffisso in più.
+  const SFX = window.LIBRO_BIN_SUFFIX || '';
+  const MODEL_PARTS = [0, 1, 2, 3, 4].map((i) => BASE + 'it_IT-paola-medium.onnx.part' + i + SFX);
   const CONFIG_URL = BASE + 'it_IT-paola-medium.onnx.json';
   const PHON_WASM = 'lib/piper/piper_phonemize.wasm';
-  const PHON_DATA = 'lib/piper/piper_phonemize.data';
+  const PHON_DATA = 'lib/piper/piper_phonemize.data' + SFX;
   const TOTAL_BYTES = 63511038 + 635212 + 1064825;
   const PAUSE_MS = 140; // breve pausa dopo ogni frase
   const abs = (u) => new URL(u, location.href).href;
