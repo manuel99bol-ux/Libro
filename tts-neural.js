@@ -11,15 +11,24 @@
   const PHON_WASM = 'lib/piper/piper_phonemize.wasm';
   const PHON_DATA = 'lib/piper/piper_phonemize.data' + SFX;
   const TOTAL_BYTES = 63511038 + 635212 + 1064825;
-  const PAUSE_MS = 140; // breve pausa dopo ogni frase
+  // Stili di lettura: espressività (noise), variabilità del ritmo (noiseW), lentezza e pausa tra le frasi.
+  const STYLES = {
+    naturale: { label: 'Naturale', noiseScale: 0.7, noiseW: 0.95, length: 1.07, pause: 300 },
+    calma: { label: 'Calma', noiseScale: 0.6, noiseW: 0.8, length: 1.15, pause: 380 },
+    espressiva: { label: 'Espressiva', noiseScale: 0.85, noiseW: 1.1, length: 1.0, pause: 240 },
+    originale: { label: 'Originale', noiseScale: 0.8, noiseW: 0.8, length: 1.0, pause: 140 },
+  };
+  let savedStyle = 'naturale';
+  try { savedStyle = JSON.parse(localStorage.getItem('libro:neuralStyle')) || 'naturale'; } catch (e) { /* ignora */ }
+  if (!STYLES[savedStyle]) savedStyle = 'naturale';
   const abs = (u) => new URL(u, location.href).href;
 
   const CANCELED = { canceled: true };
   // Mezzo secondo di silenzio: serve a "sbloccare" l'audio su iPhone al primo tocco.
   const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQAAAAA=';
 
-  function encodeWav(pcm, sampleRate) {
-    const pad = Math.round(sampleRate * PAUSE_MS / 1000);
+  function encodeWav(pcm, sampleRate, pauseMs) {
+    const pad = Math.round(sampleRate * pauseMs / 1000);
     const n = pcm.length + pad;
     const buf = new ArrayBuffer(44 + n * 2);
     const v = new DataView(buf);
@@ -44,6 +53,13 @@
     id: 'neural:paola',
     name: 'Paola',
     sizeMB: Math.round(TOTAL_BYTES / 1e6),
+    styles: STYLES,
+    style: savedStyle,
+    setStyle(name) {
+      if (!STYLES[name] || name === this.style) return;
+      this.style = name;
+      try { localStorage.setItem('libro:neuralStyle', JSON.stringify(name)); } catch (e) { /* ignora */ }
+    },
     state: 'idle',          // idle | loading | ready | error
     error: '',
     progress: 0,
@@ -159,7 +175,8 @@
     },
 
     clip(text, rate) {
-      const key = rate.toFixed(2) + '|' + text;
+      const st = STYLES[this.style];
+      const key = this.style + '|' + rate.toFixed(2) + '|' + text;
       if (this.clips.has(key)) {
         const c = this.clips.get(key);
         this.clips.delete(key);
@@ -167,10 +184,10 @@
         return c;
       }
       const p = this.load()
-        .then(() => this.call({ type: 'synth', text, lengthScale: 1 / rate }))
+        .then(() => this.call({ type: 'synth', text, lengthScale: st.length / rate, noiseScale: st.noiseScale, noiseW: st.noiseW }))
         .then((m) => {
           if (!m.pcm || !m.pcm.length) return { url: null, ms: m.ms };
-          return { url: URL.createObjectURL(encodeWav(m.pcm, this.sampleRate)), ms: m.ms };
+          return { url: URL.createObjectURL(encodeWav(m.pcm, this.sampleRate, st.pause / rate)), ms: m.ms };
         });
       p.catch(() => this.clips.delete(key));
       this.clips.set(key, p);

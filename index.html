@@ -240,6 +240,14 @@
               Si scarica una volta sola (circa 65 MB: meglio con il Wi-Fi).</p>
             <button id="neuralBtn" class="btn btn-primary neural-btn" type="button">Scarica e usa Paola</button>
             <progress id="neuralProg" class="neural-prog hidden" max="100" value="0"></progress>
+            <label class="neural-style" for="neuralStyle">Stile di lettura
+              <select id="neuralStyle">
+                <option value="naturale">Naturale (consigliato)</option>
+                <option value="calma">Calma: più lenta, pause lunghe</option>
+                <option value="espressiva">Espressiva: più intonazione</option>
+                <option value="originale">Originale del modello</option>
+              </select>
+            </label>
             <p id="neuralMsg" class="neural-msg" aria-live="polite"></p>
           </div>
           <div class="field">

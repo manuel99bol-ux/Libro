@@ -27,6 +27,7 @@
     neuralBtn: $('neuralBtn'),
     neuralProg: $('neuralProg'),
     neuralMsg: $('neuralMsg'),
+    neuralStyle: $('neuralStyle'),
     rateInput: $('rateInput'),
     rateValue: $('rateValue'),
     fontInput: $('fontInput'),
@@ -456,6 +457,7 @@
     else if (active && st === 'ready') msg = 'Voce naturale attiva ✓ Funziona anche senza internet.';
     else if (active) msg = 'Selezionata: si avvia quando premi Leggi.';
     else btn = neuralDownloaded ? 'Usa Paola' : 'Scarica e usa Paola (' + Neural.sizeMB + ' MB)';
+    el.neuralStyle.closest('label').classList.toggle('hidden', !active);
     el.neuralMsg.textContent = msg;
     el.neuralBtn.textContent = btn;
     el.neuralBtn.classList.toggle('hidden', !btn);
@@ -689,6 +691,11 @@
   });
   if (neuralOk) {
     el.neuralBtn.addEventListener('click', () => { Neural.unlock(); useNeural(); });
+    el.neuralStyle.value = Neural.style;
+    el.neuralStyle.addEventListener('change', () => {
+      Neural.setStyle(el.neuralStyle.value);
+      if (state.mode === 'playing') play(); // riparte la frase con il nuovo stile
+    });
     Neural.onChange(updateNeuralUi);
     Neural.isDownloaded().then((ok) => {
       neuralDownloaded = ok;
