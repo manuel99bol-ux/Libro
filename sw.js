@@ -1,6 +1,6 @@
 /* Service worker: rende l'app disponibile anche senza connessione e abilita
    l'"isolamento" della pagina, che permette alle voci naturali di usare più core. */
-const CACHE = 'libro-v5';
+const CACHE = 'libro-v6';
 const FILES = [
   './',
   'index.html',
@@ -21,6 +21,8 @@ const FILES = [
   'icons/icon-512.png',
   'icons/icon-maskable-512.png',
   'icons/apple-touch-icon.png',
+  'voices/samples/paola.wav',
+  'voices/samples/sara.wav',
 ];
 
 self.addEventListener('install', (e) => {
@@ -50,7 +52,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   // I modelli delle voci e l'audio preparato hanno una cache loro: qui non li duplichiamo.
-  const own = url.pathname.includes('/voices/') || url.pathname.includes('/__audio/');
+  const own = (url.pathname.includes('/voices/') && !url.pathname.includes('/samples/')) || url.pathname.includes('/__audio/');
   e.respondWith(
     fetch(e.request)
       .then((res) => {

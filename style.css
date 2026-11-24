@@ -216,14 +216,15 @@ button { font: inherit; color: inherit; }
 .neural-head { font-size: 1.05rem; }
 .neural-text { margin: 6px 0 10px; font-size: 0.92rem; color: var(--muted); line-height: 1.45; }
 .nv {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
   padding: 10px 0; border-top: 1px solid var(--border);
 }
 .nv-info { display: flex; flex-direction: column; min-width: 0; }
 .nv-info span { font-size: 0.85rem; color: var(--muted); }
 .nv.on .nv-info strong::after { content: " ●"; color: var(--primary); }
-.nv-btn { flex: none; flex-direction: row; min-height: 44px; font-size: 0.9rem; padding: 6px 12px; }
 .nv-btn:disabled { opacity: 1; background: var(--highlight); }
+.nv-info { flex: 1 1 100%; }
+.nv-demo, .nv .nv-btn { flex: 1 1 0; flex-direction: row; min-height: 44px; font-size: 0.9rem; padding: 6px 10px; }
 .sara-prep { margin-top: 8px; }
 .sara-row { display: flex; gap: 8px; margin-top: 8px; }
 .sara-row select { flex: 1; font: inherit; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); }

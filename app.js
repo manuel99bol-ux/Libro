@@ -847,6 +847,27 @@
         if (state.mode === 'playing') play();
       });
     });
+    // Campioni: si ascoltano subito, senza scaricare la voce.
+    const demo = new Audio();
+    let demoBtn = null;
+    const resetDemo = () => { if (demoBtn) demoBtn.textContent = '▶ Esempio'; demoBtn = null; };
+    demo.addEventListener('ended', resetDemo);
+    demo.addEventListener('error', () => { resetDemo(); toast('Esempio non disponibile'); });
+    el.neuralBox.querySelectorAll('.nv-demo').forEach((b) => {
+      b.addEventListener('click', () => {
+        const same = demoBtn === b;
+        demo.pause();
+        resetDemo();
+        if (same) return;
+        if (state.mode === 'playing') pause();
+        demo.src = b.dataset.sample;
+        demo.currentTime = 0;
+        const p = demo.play();
+        if (p && p.catch) p.catch(() => resetDemo());
+        demoBtn = b;
+        b.textContent = '■ Stop';
+      });
+    });
     const paola = NV.get('neural:paola');
     el.neuralStyle.value = paola.style;
     el.neuralStyle.addEventListener('change', () => {
