@@ -452,7 +452,22 @@
       want: [],
       pumping: false,
       msPerChar: 0,
-      settings: Object.assign({ key: '', region: 'westeurope', voice: 'it-IT-IsabellaNeural', voices: null }, store.get('azure', {})),
+      settings: Object.assign({ key: '', region: 'westeurope', voice: 'it-IT-IsabellaNeural', voices: null, limit: 500000 }, store.get('azure', {})),
+
+      // Conteggio dei caratteri inviati ad Azure in questo mese (stima fatta dall'app su questo dispositivo:
+      // con la chiave del servizio vocale Azure non permette di leggere la quota residua).
+      month() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); },
+      usage() {
+        const u = store.get('azureUsage', null);
+        return u && u.month === this.month() ? u : { month: this.month(), chars: 0, exhausted: false };
+      },
+      addUsage(n) { const u = this.usage(); u.chars += n; store.set('azureUsage', u); this.emit(); },
+      setExhausted() { const u = this.usage(); u.exhausted = true; store.set('azureUsage', u); this.emit(); },
+      resetUsage() { store.set('azureUsage', { month: this.month(), chars: 0, exhausted: false }); this.emit(); },
+      limit() { return Math.max(0, Number(this.settings.limit) || 500000); },
+      setLimit(n) { this.settings.limit = Math.max(0, Math.round(Number(n) || 0)); this.save(); this.emit(); },
+      remaining() { const u = this.usage(); return u.exhausted ? 0 : Math.max(0, this.limit() - u.chars); },
+      keyForVoice(text, voice) { return 'az-' + voice.replace(/\W/g, '') + '-' + hash(text); },
 
       onChange(fn) { this.listeners.add(fn); },
       emit() { this.listeners.forEach((fn) => { try { fn(this); } catch (e) { /* ignora */ } }); },
@@ -546,14 +561,16 @@
           } catch (e) { throw azError(0, false); }
           if (res.ok) {
             const blob = await res.blob();
+            this.addUsage(text.length);
             if (text.length) this.msPerChar = (Date.now() - t0) / text.length;
             return { blob: new Blob([blob], { type: 'audio/mpeg' }), dur: text.length / 14 + pause / 1000 };
           }
           if (res.status === 429 && attempt < 2) { await new Promise((r) => setTimeout(r, 1500 * (attempt + 1))); continue; }
+          if (res.status === 403) this.setExhausted();
           throw azError(res.status, res.status === 401 || res.status === 403 || res.status === 429);
         }
       },
-      keyOf(text) { return 'az-' + this.settings.voice.replace(/\W/g, '') + '-' + hash(text); },
+      keyOf(text) { return this.keyForVoice(text, this.settings.voice); },
       clip(text) {
         const key = this.keyOf(text);
         if (this.inflight.has(key)) return this.inflight.get(key);

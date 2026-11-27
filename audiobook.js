@@ -13,6 +13,12 @@
     from: $('abFrom'),
     to: $('abTo'),
     all: $('abAll'),
+    thisPage: $('abThis'),
+    toEnd: $('abToEnd'),
+    quota: $('abQuota'),
+    quotaText: $('abQuotaText'),
+    quotaBar: $('abQuotaBar'),
+    fit: $('abFit'),
     estimate: $('abEstimate'),
     start: $('abStart'),
     createBox: $('abCreate'),
@@ -110,9 +116,52 @@
       const speed = v.startsWith('azure:') ? 0.15 : v === 'neural:sara' ? 2.2 : 0.35; // tempo di creazione rispetto al parlato (stima)
       let t = pages.length + (pages.length === 1 ? ' pagina' : ' pagine') + ' · circa ' + fmtLong(dur) + ' di ascolto · circa ' + fmtMB(dur * KBPS * 125) +
         '. Tempo di creazione stimato: ' + fmtLong(dur * speed) + ' (dipende dal telefono).';
-      if (v.startsWith('azure:')) t += ' Userà circa ' + Math.round(total).toLocaleString('it-IT') + ' caratteri della quota gratuita di Azure (circa 500.000 al mese).';
       ui.estimate.textContent = t;
+      if (v.startsWith('azure:')) azurePlan(pages, v.slice(6));
+      else ui.quota.classList.add('hidden');
     }, 250);
+  }
+
+  // Quante pagine si possono registrare con la quota Azure rimasta questo mese.
+  // Le frasi già scaricate (per la stessa voce) restano sul telefono e non consumano quota.
+  let planToken = 0;
+  async function azurePlan(pages, voice) {
+    const my = ++planToken;
+    const az = NV.azure;
+    const fmt = (n) => Math.round(n).toLocaleString('it-IT');
+    ui.quota.classList.remove('hidden', 'warn', 'bad');
+    ui.fit.classList.add('hidden');
+    ui.quotaBar.value = 0;
+    ui.quotaText.textContent = 'Calcolo la quota Azure necessaria…';
+    const remaining = az.remaining();
+    let need = 0, lastFit = 0, fitDur = 0;
+    for (let k = 0; k < pages.length; k++) {
+      const list = await App.pageSentences(pages[k]);
+      if (my !== planToken) return;
+      for (let i = 0; i < list.length; i++) {
+        const text = App.spoken(list, i);
+        if (text.trim() && !NV.clips.has(az.keyForVoice(text, voice))) need += text.length;
+      }
+      if (need <= remaining) { lastFit = k + 1; fitDur = need / 14; }
+      if (k % 10 === 9) { ui.quotaText.textContent = 'Calcolo la quota Azure necessaria… (' + (k + 1) + ' di ' + pages.length + ' pagine)'; await new Promise((r) => setTimeout(r, 0)); }
+    }
+    if (my !== planToken) return;
+    ui.quotaBar.value = need ? Math.round(Math.min(1, remaining / need) * 1000) : 1000;
+    const head = 'Quota Azure rimasta questo mese: circa ' + fmt(remaining) + ' caratteri. Per le pagine scelte ne servono circa ' + fmt(need) + '. ';
+    if (need <= remaining) {
+      ui.quotaText.textContent = head + '✓ Bastano per tutte le pagine: dopo te ne resteranno circa ' + fmt(remaining - need) + '.';
+    } else if (lastFit > 0) {
+      const lastPage = pages[lastFit - 1];
+      ui.quota.classList.add('warn');
+      ui.quotaText.textContent = head + 'Bastano fino a pagina ' + lastPage + ' (' + lastFit + ' di ' + pages.length + ' pagine, circa ' + fmtLong(fitDur) + ' di ascolto). ' +
+        'Le altre ' + (pages.length - lastFit) + ' pagine si possono creare il mese prossimo con «Continua creazione», oppure con Paola o Sara.';
+      ui.fit.textContent = 'Crea solo fino a pagina ' + lastPage;
+      ui.fit.dataset.page = lastPage;
+      ui.fit.classList.remove('hidden');
+    } else {
+      ui.quota.classList.add('bad');
+      ui.quotaText.textContent = head + 'La quota non basta nemmeno per la prima pagina: scegli Paola o Sara, oppure aspetta il mese prossimo.';
+    }
   }
 
   // ---------- Creazione ----------
@@ -183,8 +232,20 @@
           if (!text.trim()) continue;
           marks.push({ t: meta.dur + t, p, i, text: list[i] });
           if (azure) {
-            const c = await eng.synthVoice(text, azure);
-            const frames = await stripId3(c.blob);
+            const key = eng.keyForVoice(text, azure);
+            let blob = null;
+            const have = await NV.clips.get(key);
+            if (have && have.url) { try { blob = await (await fetch(have.url)).blob(); } catch (e) { blob = null; } }
+            if (!blob) {
+              if (eng.remaining() < text.length) {
+                marks.length = Math.max(0, marks.length - 1);
+                throw new Error('Limite gratuito di Azure di questo mese raggiunto (stima) a pagina ' + p + '.');
+              }
+              const c = await eng.synthVoice(text, azure);
+              blob = c.blob;
+              NV.clips.put(key, blob, blob.size * 8 / (KBPS * 1000)).catch(() => {});
+            }
+            const frames = await stripId3(blob);
             mp3.push(frames);
             t += frames.size * 8 / (KBPS * 1000);
           } else {
@@ -310,6 +371,9 @@
   });
   ui.cancelBtn.addEventListener('click', () => { if (job) job.cancelled = true; });
   ui.all.addEventListener('click', () => { ui.from.value = 1; ui.to.value = S.pdf ? S.pdf.numPages : 1; updateEstimate(); });
+  ui.thisPage.addEventListener('click', () => { ui.from.value = ui.to.value = S.page || 1; updateEstimate(); });
+  ui.toEnd.addEventListener('click', () => { ui.from.value = S.page || 1; ui.to.value = S.pdf ? S.pdf.numPages : 1; updateEstimate(); });
+  ui.fit.addEventListener('click', () => { ui.to.value = ui.fit.dataset.page; updateEstimate(); });
   [ui.from, ui.to, ui.voice].forEach((el) => el.addEventListener('change', updateEstimate));
 
   // ---------- Elenco ----------

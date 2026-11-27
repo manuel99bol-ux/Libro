@@ -38,6 +38,12 @@ Si può installare sulla schermata Home e funziona anche offline.
   si interrompe, con «Continua creazione» riparte da dove era arrivata.
 - Si ascolta **offline**, anche a schermo spento: frase corrente a schermo, ±15/30 s, pagina precedente/successiva,
   velocità da 0,8× a 2×, posizione ricordata, comandi nel blocco schermo e nel Centro di controllo.
+- Pagine: scegli un intervallo qualsiasi (da … a …) o usa «Questa pagina», «Da qui alla fine», «Tutto il libro».
+- Con una voce **Azure** l'app mostra la quota rimasta nel mese, quanti caratteri servono per le pagine scelte e
+  fino a quale pagina basta (con il pulsante «Crea solo fino a pagina …»). Le frasi già scaricate non consumano di
+  nuovo quota; se il limite arriva durante la creazione, l'app si ferma e il mese dopo «Continua creazione».
+  Il conteggio è fatto dall'app su questo dispositivo (Azure non lo rende leggibile con la chiave): il dato
+  ufficiale resta quello del portale Azure. Il limite mensile si può cambiare nel pannello Azure.
 - **⬇️ Scarica** salva il file MP3 (su iPhone: Condividi → Salva su File) per ascoltarlo anche con altre app.
 - Durante la creazione l'app deve restare aperta (meglio in carica): lo schermo resta acceso finché non ha finito.
 

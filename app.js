@@ -46,6 +46,10 @@
     azUse: $('azUse'),
     azDisconnect: $('azDisconnect'),
     azMsg: $('azMsg'),
+    azUsage: $('azUsage'),
+    azUsageBar: $('azUsageBar'),
+    azLimit: $('azLimit'),
+    azUsageReset: $('azUsageReset'),
     rateInput: $('rateInput'),
     rateValue: $('rateValue'),
     fontInput: $('fontInput'),
@@ -717,6 +721,13 @@
         el.azVoice.appendChild(o);
       });
       el.azVoice.value = cur && az.voices().some((v) => v.name === cur) ? cur : az.settings.voice;
+      const u = az.usage(), lim = az.limit(), fmt = (n) => Math.round(n).toLocaleString('it-IT');
+      el.azUsage.textContent = u.exhausted
+        ? 'Questo mese Azure ha segnalato la quota esaurita: si riparte il mese prossimo.'
+        : 'Questo mese hai usato circa ' + fmt(u.chars) + ' di ' + fmt(lim) + ' caratteri gratuiti: ne restano circa ' + fmt(az.remaining()) + '. ' +
+          '(Conteggio fatto dall\'app su questo dispositivo; il dato ufficiale è nel portale Azure.)';
+      el.azUsageBar.value = lim ? Math.round(Math.min(1, u.chars / lim) * 1000) : 1000;
+      if (document.activeElement !== el.azLimit) el.azLimit.value = lim;
       const active = activeNeural() === az;
       el.azUse.textContent = active && el.voiceSelect.value === 'azure:' + el.azVoice.value ? 'In uso ✓' : 'Usa questa voce';
       if (!el.azMsg.dataset.sticky) {
@@ -1221,6 +1232,19 @@
       }
     });
     el.azVoice.addEventListener('change', updateAzureUi);
+    el.azLimit.addEventListener('change', () => { az.setLimit(el.azLimit.value); updateAzureUi(); });
+    el.azUsageReset.addEventListener('click', () => {
+      if (!el.azUsageReset.dataset.sure) {
+        el.azUsageReset.dataset.sure = '1';
+        el.azUsageReset.textContent = 'Tocca di nuovo per azzerare';
+        setTimeout(() => { el.azUsageReset.dataset.sure = ''; el.azUsageReset.textContent = 'Azzera il conteggio di questo mese'; }, 3000);
+        return;
+      }
+      el.azUsageReset.dataset.sure = '';
+      el.azUsageReset.textContent = 'Azzera il conteggio di questo mese';
+      az.resetUsage();
+      updateAzureUi();
+    });
     el.azTry.addEventListener('click', async () => {
       el.azTry.disabled = true;
       el.azMsg.textContent = 'Preparo un esempio…';

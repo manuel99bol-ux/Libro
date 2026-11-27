@@ -300,9 +300,18 @@
         <div class="ab-range">
           <label for="abFrom">Da pagina <input id="abFrom" type="number" min="1" value="1" inputmode="numeric"></label>
           <label for="abTo">a <input id="abTo" type="number" min="1" value="1" inputmode="numeric"></label>
+        </div>
+        <div class="ab-presets" role="group" aria-label="Scelte rapide delle pagine">
+          <button id="abThis" class="chip" type="button">Questa pagina</button>
+          <button id="abToEnd" class="chip" type="button">Da qui alla fine</button>
           <button id="abAll" class="chip" type="button">Tutto il libro</button>
         </div>
         <p id="abEstimate" class="ab-estimate"></p>
+        <div id="abQuota" class="ab-quota hidden">
+          <p id="abQuotaText"></p>
+          <progress id="abQuotaBar" class="neural-prog" max="1000" value="0"></progress>
+          <button id="abFit" class="btn ab-fit hidden" type="button"></button>
+        </div>
         <button id="abStart" class="btn btn-primary ab-wide" type="button">Crea audiolibro</button>
         <div id="abProgress" class="hidden">
           <progress id="abBar" class="neural-prog" max="1000" value="0"></progress>
@@ -419,6 +428,14 @@
               <div class="sara-row">
                 <button id="azTry" class="btn" type="button">▶ Prova</button>
                 <button id="azUse" class="btn btn-primary" type="button">Usa questa voce</button>
+              </div>
+              <div class="az-usage">
+                <p id="azUsage" class="ab-estimate"></p>
+                <progress id="azUsageBar" class="neural-prog" max="1000" value="0"></progress>
+                <label class="field" for="azLimit">Limite gratuito mensile (caratteri)
+                  <input id="azLimit" class="az-input" type="number" min="0" step="1000" inputmode="numeric">
+                </label>
+                <button id="azUsageReset" class="az-link" type="button">Azzera il conteggio di questo mese</button>
               </div>
               <button id="azDisconnect" class="az-link" type="button">Scollega Azure da questo dispositivo</button>
             </div>
