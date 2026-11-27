@@ -1,6 +1,6 @@
 /* Service worker: rende l'app disponibile anche senza connessione e abilita
    l'"isolamento" della pagina, che permette alle voci naturali di usare più core. */
-const CACHE = 'libro-v8';
+const CACHE = 'libro-v9';
 const FILES = [
   './',
   'index.html',
@@ -10,6 +10,9 @@ const FILES = [
   'editor.css',
   'app.js',
   'viewer.js',
+  'audiobook.js',
+  'lib/lame/lame.min.js',
+  'lib/lame/mp3-worker.js',
   'tts-neural.js',
   'lib/voice-worker.js',
   'lib/piper/piper_phonemize.js',

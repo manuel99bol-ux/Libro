@@ -1489,10 +1489,209 @@
     return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
   }
 
+
+  // ---------- Modifica reale del testo nel PDF ----------
+  // Righe del PDF modificate: copertura (whiteout) seguita dalla casella col testo nuovo.
+  function findReplacements(list) {
+    const out = [];
+    list.forEach((o, i) => {
+      if (!(o.type === 'shape' && o.whiteout)) return;
+      const n = list[i + 1];
+      let tb = null;
+      if (n && n.type === 'tbox' && (n.R || 0) === (o.R || 0)) {
+        const b = objBox(n);
+        if (b.y0 < o.y + o.h && b.y1 > o.y) tb = n; // stessa riga
+      }
+      out.push({ cover: o, tbox: tb });
+    });
+    return out;
+  }
+
+  const mMul = (a, b) => [a[0] * b[0] + a[1] * b[2], a[0] * b[1] + a[1] * b[3], a[2] * b[0] + a[3] * b[2], a[2] * b[1] + a[3] * b[3], a[4] * b[0] + a[5] * b[2] + b[4], a[4] * b[1] + a[5] * b[3] + b[5]];
+  const mApply = (m, x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
+  function mInv(m) {
+    const det = m[0] * m[3] - m[1] * m[2] || 1e-9;
+    return [m[3] / det, -m[1] / det, -m[2] / det, m[0] / det, (m[2] * m[5] - m[3] * m[4]) / det, (m[1] * m[4] - m[0] * m[5]) / det];
+  }
+  const fmtN = (x) => (Math.abs(x) < 1e-7 ? '0' : String(Math.round(x * 10000) / 10000));
+  const fmtM = (m) => m.map(fmtN).join(' ');
+
+  // Legge il contenuto di una pagina e trova dove inizia ogni scritta (operatori Tj, TJ, ', ").
+  function scanContent(src) {
+    const n = src.length;
+    const ops = [];
+    const isWS = (c) => c === 32 || c === 10 || c === 13 || c === 9 || c === 12 || c === 0;
+    const DELIM = '()<>[]{}/%';
+    const isDelim = (c) => DELIM.indexOf(String.fromCharCode(c)) >= 0;
+    let i = 0, opStart = -1, nums = [];
+    let ctm = [1, 0, 0, 1, 0, 0];
+    const stack = [];
+    let tm = [1, 0, 0, 1, 0, 0], tlm = [1, 0, 0, 1, 0, 0], tl = 0, ts = 0, last = null;
+    while (i < n) {
+      const c = src.charCodeAt(i);
+      if (isWS(c)) { i++; continue; }
+      if (c === 37) { while (i < n && src[i] !== '\n' && src[i] !== '\r') i++; continue; }
+      if (opStart < 0) opStart = i;
+      if (c === 40) { // stringa ( ... )
+        let depth = 0, j = i;
+        for (; j < n; j++) {
+          const ch = src[j];
+          if (ch === '\\') { j++; continue; }
+          if (ch === '(') depth++;
+          else if (ch === ')') { depth--; if (depth === 0) break; }
+        }
+        i = j + 1;
+        continue;
+      }
+      if (c === 60) { // < hex > oppure <<
+        if (src[i + 1] === '<') { i += 2; continue; }
+        const j = src.indexOf('>', i);
+        i = j < 0 ? n : j + 1;
+        continue;
+      }
+      if (c === 62) { i += src[i + 1] === '>' ? 2 : 1; continue; }
+      if (c === 91 || c === 93 || c === 123 || c === 125) { i++; continue; }
+      if (c === 47) { // nome
+        let j = i + 1;
+        while (j < n && !isWS(src.charCodeAt(j)) && !isDelim(src.charCodeAt(j))) j++;
+        i = j;
+        continue;
+      }
+      let j = i;
+      while (j < n && !isWS(src.charCodeAt(j)) && !isDelim(src.charCodeAt(j))) j++;
+      if (j === i) { i++; continue; }
+      const tok = src.slice(i, j);
+      i = j;
+      if (/^[+-]?(\d+\.?\d*|\.\d+)$/.test(tok)) { nums.push(parseFloat(tok)); continue; }
+      if (tok === 'true' || tok === 'false' || tok === 'null') continue;
+      const start = opStart, end = i, k = nums;
+      switch (tok) {
+        case 'q': stack.push(ctm.slice()); break;
+        case 'Q': if (stack.length) ctm = stack.pop(); break;
+        case 'cm': if (k.length >= 6) ctm = mMul(k.slice(-6), ctm); break;
+        case 'BT': tm = [1, 0, 0, 1, 0, 0]; tlm = [1, 0, 0, 1, 0, 0]; last = null; break;
+        case 'Td': if (k.length >= 2) { tlm = mMul([1, 0, 0, 1, k[k.length - 2], k[k.length - 1]], tlm); tm = tlm.slice(); last = null; } break;
+        case 'TD': if (k.length >= 2) { tl = -k[k.length - 1]; tlm = mMul([1, 0, 0, 1, k[k.length - 2], k[k.length - 1]], tlm); tm = tlm.slice(); last = null; } break;
+        case 'Tm': if (k.length >= 6) { tlm = k.slice(-6); tm = tlm.slice(); last = null; } break;
+        case 'T*': tlm = mMul([1, 0, 0, 1, 0, -tl], tlm); tm = tlm.slice(); last = null; break;
+        case 'TL': if (k.length) tl = k[k.length - 1]; break;
+        case 'Ts': if (k.length) ts = k[k.length - 1]; break;
+        case "'": case '"': case 'Tj': case 'TJ': {
+          if (tok === "'" || tok === '"') { tlm = mMul([1, 0, 0, 1, 0, -tl], tlm); tm = tlm.slice(); last = null; }
+          // Senza le larghezze dei caratteri non sappiamo dove finisce una scritta:
+          // una scritta che continua sulla stessa riga prende la posizione della precedente.
+          let p;
+          if (last) p = last;
+          else { const q = mApply(tm, 0, ts); p = mApply(ctm, q[0], q[1]); }
+          ops.push({ start, end, x: p[0], y: p[1], ctm: ctm.slice(), tlm: tlm.slice() });
+          last = p;
+          break;
+        }
+        case 'BI': { // immagine in linea: si salta fino a EI
+          let m = src.indexOf('ID', i);
+          m = m < 0 ? n : m + 2;
+          for (;;) {
+            const e = src.indexOf('EI', m);
+            if (e < 0) { m = n; break; }
+            const a = src.charCodeAt(e - 1), b = src.charCodeAt(e + 2);
+            if (isWS(a) && (e + 2 >= n || isWS(b) || isDelim(b))) { m = e + 2; break; }
+            m = e + 2;
+          }
+          i = m;
+          break;
+        }
+        default: break;
+      }
+      nums = [];
+      opStart = -1;
+    }
+    return ops;
+  }
+
+  // Toglie dal PDF il testo originale delle righe modificate e scrive il nuovo nello stesso punto
+  // del contenuto (così anche l'ordine di lettura resta giusto). Restituisce le righe riuscite.
+  function stripAndReplace(doc, page, pairs, toUser) {
+    const { PDFName, PDFArray, PDFRawStream, decodePDFRawStream } = PDFLib;
+    let contents;
+    try { contents = page.node.Contents(); } catch (e) { return []; }
+    if (!contents) return [];
+    const streams = contents instanceof PDFArray ? contents.asArray().map((r) => doc.context.lookup(r)) : [contents];
+    let src = '';
+    try {
+      for (const s of streams) {
+        if (!(s instanceof PDFRawStream)) return [];
+        const b = decodePDFRawStream(s).decode();
+        for (let i = 0; i < b.length; i += 8192) src += String.fromCharCode.apply(null, b.subarray(i, i + 8192));
+        src += '\n';
+      }
+    } catch (e) { return []; }
+    const rects = pairs.map((pr) => {
+      const c = pr.cover;
+      const pts = [[c.x, c.y], [c.x + c.w, c.y], [c.x, c.y + c.h], [c.x + c.w, c.y + c.h]].map((q) => toUser(c.R || 0, q[0], q[1]));
+      const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+      return { x0: Math.min(...xs) - 1, x1: Math.max(...xs) + 1, y0: Math.min(...ys) - 1, y1: Math.max(...ys) + 1 };
+    });
+    const rem = [];
+    for (const op of scanContent(src)) {
+      const idx = rects.findIndex((r) => op.x >= r.x0 && op.x <= r.x1 && op.y >= r.y0 && op.y <= r.y1);
+      if (idx >= 0) rem.push({ op, idx });
+    }
+    if (!rem.length) return [];
+    const first = new Map();
+    rem.forEach((r) => { if (!first.has(r.idx)) first.set(r.idx, r); });
+    let out = '';
+    let pos = 0;
+    for (const r of rem) {
+      out += src.slice(pos, r.op.start);
+      const pr = pairs[r.idx];
+      if (first.get(r.idx) === r && pr.tbox && pr.font) {
+        out += replacementOps(page, pr, r.op, toUser);
+        pr.inline = true;
+      }
+      pos = r.op.end;
+    }
+    out += src.slice(pos);
+    const bytes = new Uint8Array(out.length);
+    for (let i = 0; i < out.length; i++) bytes[i] = out.charCodeAt(i) & 255;
+    // Come elenco: la libreria aggiunge poi i propri contenuti (forme, immagini) in coda.
+    const ref = doc.context.register(doc.context.flateStream(bytes));
+    page.node.set(PDFName.of('Contents'), doc.context.obj([ref]));
+    return [...first.keys()].map((i) => pairs[i]);
+  }
+
+  // Operatori PDF per scrivere il testo nuovo nel punto in cui c'era quello vecchio.
+  function replacementOps(page, pr, op, toUser) {
+    const o = pr.tbox;
+    const L = layoutText(o);
+    const key = page.node.newFontDictionary('LibroT', pr.font.ref).toString();
+    let h = (o.color || '#000000').replace('#', '');
+    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+    const num = parseInt(h, 16) || 0;
+    const col = [(num >> 16) & 255, (num >> 8) & 255, num & 255].map((x) => fmtN(x / 255)).join(' ');
+    const R = (o.R || 0) * Math.PI / 180;
+    const cs = Math.cos(R), sn = Math.sin(R);
+    let s = ' ET q ' + fmtM(mInv(op.ctm)) + ' cm BT ' + key + ' ' + fmtN(o.size) + ' Tf ' + col + ' rg 0 Tr 0 Tc 0 Tw 100 Tz 0 Ts ';
+    for (const l of L.lines) {
+      for (const seg of l.segs) {
+        if (!seg.t) continue;
+        const [x, y] = toUser(o.R || 0, seg.x, l.base);
+        s += fmtM([cs, sn, -sn, cs, x, y]) + ' Tm ' + pr.font.encodeText(seg.t).toString() + ' Tj ';
+      }
+    }
+    return s + 'ET Q BT ' + fmtM(op.tlm) + ' Tm ';
+  }
+
   let lastBlob = null;
   let lastName = '';
+  // Nell'anteprima su claude.ai i file si salvano con la funzione «downloads» della piattaforma.
+  let platformDownloads = null;
+  (async () => {
+    try { if (window.claude && typeof window.claude.use === 'function') platformDownloads = await window.claude.use('downloads'); } catch (e) { /* non disponibile */ }
+  })();
 
+  let realEdits = 0;
   async function buildPdf() {
+    realEdits = 0;
     await ensureMetrics();
     const { PDFDocument, degrees, LineCapStyle, BlendMode } = PDFLib;
     const order = getOrder().filter((k) => !edits().del[k]);
@@ -1551,7 +1750,21 @@
         const [ox, oy] = toUser(R, 0, 0);
         page.drawSvgPath(path, Object.assign({ x: ox, y: oy, rotate: degrees(R) }, opts));
       };
+      // Righe modificate: il testo originale viene tolto davvero e quello nuovo scritto al suo posto.
+      const skip = new Set();
+      const pairs = srcOf(k) ? findReplacements(edits().ann[k] || []) : [];
+      if (pairs.length) {
+        for (const pr of pairs) {
+          if (pr.tbox && !pr.tbox.hl && !pr.tbox.underline && pr.tbox.text.trim()) pr.font = await getFont(layoutText(pr.tbox).name);
+        }
+        for (const pr of stripAndReplace(doc, page, pairs, toUser)) {
+          skip.add(pr.cover);
+          if (pr.inline) skip.add(pr.tbox);
+        }
+        realEdits += skip.size ? 1 : 0;
+      }
       for (const o of (edits().ann[k] || [])) {
+        if (skip.has(o)) continue;
         const R = o.R || 0;
         if (o.type === 'ink' && o.pts.length) {
           const opts = { borderColor: hexToRgb(o.color), borderWidth: o.width, borderLineCap: LineCapStyle.Round };
@@ -1600,12 +1813,12 @@
     try {
       const bytes = await buildPdf();
       lastBlob = new Blob([bytes], { type: 'application/pdf' });
-      lastName = S.bookName.replace(/\.pdf$/i, '') + ' (modificato).pdf';
+      lastName = S.bookName.replace(/(\s*\(modificato\))*\.pdf$/i, '') + ' (modificato).pdf';
       App.hideLoading();
       const pages = getOrder().filter((k) => !edits().del[k]).length;
       const mb = (lastBlob.size / 1048576).toFixed(1);
       ui.saveInfo.textContent = '«' + lastName + '» — ' + pages + (pages === 1 ? ' pagina' : ' pagine') + ', ' + mb + ' MB. Il file originale non viene toccato.';
-      const canShare = !!(navigator.canShare && navigator.canShare({ files: [new File([lastBlob], lastName, { type: 'application/pdf' })] }));
+      const canShare = !platformDownloads && !!(navigator.canShare && navigator.canShare({ files: [new File([lastBlob], lastName, { type: 'application/pdf' })] }));
       ui.shareBtn.classList.toggle('hidden', !canShare);
       if (share && canShare) { shareBlob(); return; }
       ui.saveDialog.returnValue = '';
@@ -1617,6 +1830,15 @@
     }
   }
   function downloadBlob() {
+    if (platformDownloads) {
+      platformDownloads.save({ filename: lastName, data: lastBlob })
+        .then((r) => { if (r && r.status === 'saved') App.toast('PDF salvato ✓'); })
+        .catch((e) => {
+          if (!e || e.code === 'declined') return;
+          App.toast(e.code === 'host_unavailable' ? 'Qui non si possono salvare file: apri l\'app nel browser o sul computer.' : 'Salvataggio non riuscito: ' + (e.message || e.code), 4500);
+        });
+      return;
+    }
     const url = URL.createObjectURL(lastBlob);
     const a = document.createElement('a');
     a.href = url;
@@ -1634,6 +1856,11 @@
     if (!lastBlob) return;
     if (ui.saveDialog.returnValue === 'download') downloadBlob();
     else if (ui.saveDialog.returnValue === 'share') shareBlob();
+    else if (ui.saveDialog.returnValue === 'continue') {
+      // Il PDF modificato diventa il libro aperto (le modifiche ora fanno parte del file).
+      setEditMode(false);
+      lastBlob.arrayBuffer().then((buf) => App.openPdfBytes(buf, lastName));
+    }
   });
 
   // ---------- Zoom ----------

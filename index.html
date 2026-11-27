@@ -263,6 +263,74 @@
       <p class="hint">Tocca una frase per iniziare a leggere da lì.</p>
     </section>
 
+    <!-- Audiolibro -->
+    <section id="viewAudio" class="view" aria-label="Audiolibro">
+      <div id="abPlayer" class="card ab-player hidden">
+        <div class="ab-phead">
+          <div class="ab-ptitles"><strong id="abPTitle"></strong><span id="abPSub"></span></div>
+          <button id="abPClose" class="sheet-close" type="button" aria-label="Chiudi il lettore">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+        <p id="abPText" class="ab-ptext">…</p>
+        <input id="abPSeek" class="ab-seek" type="range" min="0" max="1000" value="0" aria-label="Posizione">
+        <div class="ab-times"><span id="abPTime">0:00</span><span id="abPTotal">0:00</span></div>
+        <div class="ab-controls">
+          <button id="abPPrevPage" class="ab-cbtn" type="button" aria-label="Pagina precedente">⏮</button>
+          <button id="abPBack" class="ab-cbtn" type="button" aria-label="Indietro 15 secondi">↺<small>15</small></button>
+          <button id="abPPlay" class="ab-play" type="button" aria-label="Ascolta">▶</button>
+          <button id="abPFwd" class="ab-cbtn" type="button" aria-label="Avanti 30 secondi">↻<small>30</small></button>
+          <button id="abPNextPage" class="ab-cbtn" type="button" aria-label="Pagina successiva">⏭</button>
+        </div>
+        <label class="ab-rate" for="abPRate">Velocità
+          <select id="abPRate">
+            <option value="0.8">0,8×</option><option value="0.9">0,9×</option><option value="1">1×</option>
+            <option value="1.1">1,1×</option><option value="1.25">1,25×</option><option value="1.5">1,5×</option>
+            <option value="1.75">1,75×</option><option value="2">2×</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="abCreate" class="card ab-create">
+        <h2 class="ab-h">🎧 Crea l'audiolibro</h2>
+        <p class="ab-sub">Registra il libro con una voce naturale: lo ascolti anche senza internet e a schermo spento, e puoi scaricarlo in MP3. <span id="abBookName"></span></p>
+        <label class="field" for="abVoice">Voce
+          <select id="abVoice"></select>
+        </label>
+        <div class="ab-range">
+          <label for="abFrom">Da pagina <input id="abFrom" type="number" min="1" value="1" inputmode="numeric"></label>
+          <label for="abTo">a <input id="abTo" type="number" min="1" value="1" inputmode="numeric"></label>
+        </div>
+        <div class="ab-presets" role="group" aria-label="Scelte rapide delle pagine">
+          <button id="abThis" class="chip" type="button">Questa pagina</button>
+          <button id="abToEnd" class="chip" type="button">Da qui alla fine</button>
+          <button id="abAll" class="chip" type="button">Tutto il libro</button>
+        </div>
+        <p id="abEstimate" class="ab-estimate"></p>
+        <div id="abQuota" class="ab-quota hidden">
+          <p id="abQuotaText"></p>
+          <progress id="abQuotaBar" class="neural-prog" max="1000" value="0"></progress>
+          <button id="abFit" class="btn ab-fit hidden" type="button"></button>
+        </div>
+        <button id="abStart" class="btn btn-primary ab-wide" type="button">Crea audiolibro</button>
+        <div id="abProgress" class="hidden">
+          <progress id="abBar" class="neural-prog" max="1000" value="0"></progress>
+          <p id="abProgText" class="ab-estimate"></p>
+          <div class="sara-row">
+            <button id="abPauseGen" class="btn" type="button">Pausa</button>
+            <button id="abCancelGen" class="btn" type="button">Interrompi</button>
+          </div>
+        </div>
+        <p class="ab-note">Le voci del telefono e quella di Claude non si possono registrare: per l'audiolibro servono Paola, Sara o Azure.</p>
+      </div>
+
+      <div class="card">
+        <h2 class="ab-h">I tuoi audiolibri</h2>
+        <div id="abList"></div>
+        <p id="abStorage" class="ab-estimate"></p>
+      </div>
+    </section>
+
     <!-- Pagine / documento -->
     <section id="viewPages" class="view" aria-label="Pagine">
       <div id="pagesScroll" class="pages-scroll">
@@ -361,6 +429,14 @@
                 <button id="azTry" class="btn" type="button">▶ Prova</button>
                 <button id="azUse" class="btn btn-primary" type="button">Usa questa voce</button>
               </div>
+              <div class="az-usage">
+                <p id="azUsage" class="ab-estimate"></p>
+                <progress id="azUsageBar" class="neural-prog" max="1000" value="0"></progress>
+                <label class="field" for="azLimit">Limite gratuito mensile (caratteri)
+                  <input id="azLimit" class="az-input" type="number" min="0" step="1000" inputmode="numeric">
+                </label>
+                <button id="azUsageReset" class="az-link" type="button">Azzera il conteggio di questo mese</button>
+              </div>
               <button id="azDisconnect" class="az-link" type="button">Scollega Azure da questo dispositivo</button>
             </div>
             <p id="azMsg" class="neural-msg" aria-live="polite"></p>
@@ -408,12 +484,17 @@
   </div>
 
   <nav id="tabbar" class="tabbar hidden" aria-label="Sezioni">
-    <span class="blob blob-green" aria-hidden="true"></span>
-    <span class="blob blob-pink" aria-hidden="true"></span>
+    <span class="blobs" aria-hidden="true"><span class="blob blob-green"></span><span class="blob blob-pink"></span></span>
     <button class="tab" data-view="viewListen">
       <span class="tab-pill">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><rect x="3" y="13.5" width="5" height="7.5" rx="2" fill="currentColor"/><rect x="16" y="13.5" width="5" height="7.5" rx="2" fill="currentColor"/></svg>
         <span class="tab-lbl">Ascolta</span>
+      </span>
+    </button>
+    <button class="tab" data-view="viewAudio">
+      <span class="tab-pill">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        <span class="tab-lbl">Audiolibro</span>
       </span>
     </button>
     <button class="tab" data-view="viewPages">
@@ -435,8 +516,10 @@
       <div class="dialog-buttons">
         <button value="cancel" class="btn">Chiudi</button>
         <button value="share" id="shareBtn" class="btn hidden">📤 Condividi</button>
-        <button value="download" class="btn btn-primary">⬇️ Scarica</button>
+        <button value="download" class="btn btn-primary">⬇️ Salva sul dispositivo</button>
       </div>
+      <button value="continue" class="btn continue-btn">📖 Continua con la versione modificata</button>
+      <p class="continue-note">L'app apre il PDF modificato al posto dell'originale e lo ricorda anche alla prossima apertura.</p>
     </form>
   </dialog>
 
@@ -447,5 +530,6 @@
   <script src="tts-neural.js"></script>
   <script src="app.js"></script>
   <script src="viewer.js"></script>
+  <script src="audiobook.js"></script>
 </body>
 </html>

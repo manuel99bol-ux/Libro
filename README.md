@@ -31,6 +31,22 @@ Si può installare sulla schermata Home e funziona anche offline.
   non è più valida, l'app passa da sola a Paola (se scaricata) o alla voce del telefono.
 - Il testo letto viene inviato a Microsoft per generare l'audio.
 
+**🎧 Audiolibro** (scheda in basso)
+- Crea la registrazione del libro (tutto o da una pagina a un'altra) con **Paola**, **Sara** o una voce **Azure**.
+  Le voci del telefono e quella di Claude non si possono registrare.
+- L'audio viene salvato sul telefono in MP3 (circa 20 MB per ora di ascolto), pagina per pagina: se la creazione
+  si interrompe, con «Continua creazione» riparte da dove era arrivata.
+- Si ascolta **offline**, anche a schermo spento: frase corrente a schermo, ±15/30 s, pagina precedente/successiva,
+  velocità da 0,8× a 2×, posizione ricordata, comandi nel blocco schermo e nel Centro di controllo.
+- Pagine: scegli un intervallo qualsiasi (da … a …) o usa «Questa pagina», «Da qui alla fine», «Tutto il libro».
+- Con una voce **Azure** l'app mostra la quota rimasta nel mese, quanti caratteri servono per le pagine scelte e
+  fino a quale pagina basta (con il pulsante «Crea solo fino a pagina …»). Le frasi già scaricate non consumano di
+  nuovo quota; se il limite arriva durante la creazione, l'app si ferma e il mese dopo «Continua creazione».
+  Il conteggio è fatto dall'app su questo dispositivo (Azure non lo rende leggibile con la chiave): il dato
+  ufficiale resta quello del portale Azure. Il limite mensile si può cambiare nel pannello Azure.
+- **⬇️ Scarica** salva il file MP3 (su iPhone: Condividi → Salva su File) per ascoltarlo anche con altre app.
+- Durante la creazione l'app deve restare aperta (meglio in carica): lo schermo resta acceso finché non ha finito.
+
 **📄 Pagine**
 - Il PDF completo, pagina per pagina, così com'è (immagini comprese).
 - Zoom con ➖ ➕ o col pizzico a due dita.
@@ -59,8 +75,9 @@ la maniglia rotonda. Un secondo tocco su una casella di testo la rimette in modi
 scorre e si ingrandisce anche mentre si disegna. Le modifiche si salvano da sole sul telefono.
 
 **Salva PDF** crea «… (modificato).pdf» con tutte le modifiche (anche ordine, rotazione ed eliminazione
-delle pagine), da scaricare o condividere. L'originale non viene toccato e il file esportato si può
-riaprire nell'app e modificare di nuovo.
+delle pagine), da salvare o condividere. L'originale non viene toccato. Con **«Continua con la versione
+modificata»** l'app apre subito il nuovo PDF al posto dell'originale e lo ricorda alla prossima apertura.
+Anche senza salvare, le modifiche restano nell'app e la lettura ad alta voce legge già il testo nuovo.
 
 ## Come avviarla
 
@@ -80,13 +97,18 @@ Fai doppio clic su `index.html`. Oppure, in un terminale nella cartella:
 - Le voci dipendono dal sistema. Su Android se ne installano altre da *Impostazioni → Sintesi vocale*,
   su iPhone da *Impostazioni → Accessibilità → Contenuti letti ad alta voce → Voci*.
 - I PDF scansionati (solo immagini) si vedono e si annotano, ma non si possono leggere ad alta voce.
-- Il testo originale modificato viene coperto, non cancellato: nel PDF esportato non si vede più, ma un
-  programma che estrae il testo (o un «copia e incolla» da quella zona) può ancora trovarlo.
+- Nel PDF salvato il testo originale delle righe modificate viene tolto davvero e quello nuovo è scritto nello
+  stesso punto, così anche la lettura ad alta voce e il «copia e incolla» trovano il testo nuovo. Se in una pagina
+  il testo è dentro elementi complessi (per esempio moduli incorporati), l'app torna a coprirlo e scriverci sopra.
+- La riga modificata usa uno dei tre caratteri standard (simili ad Arial, Times New Roman e Courier New):
+  se il libro usa un carattere diverso, la differenza può notarsi leggermente.
 - Se una riga è su uno sfondo sfumato o su un'immagine, la copertura usa un solo colore e può notarsi.
 - I caratteri disponibili sono i tre standard del PDF (simili ad Arial, Times New Roman e Courier New).
 - Nei testi aggiunti si possono usare lettere accentate e la punteggiatura comune; simboli speciali
   ed emoji diventano «?» nel PDF salvato.
 
 Voci naturali: Piper «it_IT-paola-medium» (dataset CC0), Kokoro-82M (Apache-2.0), onnxruntime-web (MIT) ed espeak-ng (GPL-3.0); dettagli in `lib/piper/NOTICE.txt`.
+
+Audiolibro: codifica MP3 con lamejs (LGPL-3.0, `lib/lame/`).
 
 Librerie incluse in `lib/`: [pdf.js](https://mozilla.github.io/pdf.js/) (Apache 2.0) e [pdf-lib](https://pdf-lib.js.org/) (MIT).
