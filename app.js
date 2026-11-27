@@ -117,6 +117,15 @@
         tx.onerror = () => { db.close(); reject(tx.error); };
       });
     },
+    async del(key) {
+      const db = await this.open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('books', 'readwrite');
+        tx.objectStore('books').delete(key);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      });
+    },
     async get(key) {
       const db = await this.open();
       return new Promise((resolve, reject) => {
@@ -171,6 +180,8 @@
     const prev = state.view;
     state.view = id;
     document.body.classList.toggle('view-pages', id === 'viewPages');
+    const sv = document.getElementById(id);
+    document.body.classList.toggle('hero-compact', !!sv && id !== 'viewPages' && sv.scrollTop > 48);
     if (id !== 'welcome') store.set('view', id);
     emit('viewchange', { view: id, prev });
     if (id === 'viewListen' && state.editsDirty && state.pdf) {
@@ -1092,7 +1103,7 @@
     state, el, events, store, idb, edits: emptyEdits(), emptyEdits,
     play, pause, resume, stop, togglePlay, goToPage, showView,
     saveEdits, showLoading, hideLoading, toast, loadScript,
-    speechText, openPdfBytes,
+    speechText, openPdfBytes, pageSentences: (n) => getPageText(n), spoken: (list, i) => spoken(list, i),
   };
 
   // ---------- Eventi ----------
@@ -1132,12 +1143,14 @@
   });
 
   // Scorrendo il testo l'intestazione si fa compatta, così resta più spazio per leggere.
-  const listenView = document.getElementById('viewListen');
-  listenView.addEventListener('scroll', () => {
-    const was = document.body.classList.contains('hero-compact');
-    const compact = was ? listenView.scrollTop > 4 : listenView.scrollTop > 48;
-    if (compact !== was) document.body.classList.toggle('hero-compact', compact);
-  }, { passive: true });
+  ['viewListen', 'viewAudio'].forEach((id) => {
+    const v = document.getElementById(id);
+    v.addEventListener('scroll', () => {
+      const was = document.body.classList.contains('hero-compact');
+      const compact = was ? v.scrollTop > 4 : v.scrollTop > 48;
+      if (compact !== was) document.body.classList.toggle('hero-compact', compact);
+    }, { passive: true });
+  });
 
   el.pageText.addEventListener('click', (e) => {
     const span = e.target.closest('.s');

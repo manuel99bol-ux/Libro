@@ -497,6 +497,52 @@ body.sheet-open #views .view { overflow: hidden; }
 }
 .hint { color: var(--muted); text-align: center; font-size: 0.88rem; font-weight: 500; }
 
+/* ---------- Audiolibro ---------- */
+#viewAudio > * { max-width: 820px; margin-left: auto; margin-right: auto; }
+.ab-h { margin: 0 0 6px; font-size: 1.15rem; font-weight: 800; }
+.ab-sub { margin: 0 0 6px; color: var(--muted); font-size: 0.92rem; font-weight: 500; }
+.ab-sub span { color: var(--text); font-weight: 700; }
+.ab-range { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font-weight: 600; font-size: 0.95rem; }
+.ab-range input {
+  width: 4.2em; font: inherit; font-weight: 700; padding: 8px; margin-left: 4px; text-align: center;
+  border: 1.5px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text);
+}
+.ab-range .chip { margin-left: auto; }
+.ab-estimate { margin: 10px 0 0; font-size: 0.88rem; color: var(--muted); font-weight: 500; line-height: 1.45; }
+.ab-estimate:empty { display: none; }
+.ab-wide { width: 100%; flex-direction: row; min-height: 50px; margin-top: 12px; font-size: 1rem; border-radius: 14px; }
+.ab-note { margin: 10px 0 0; font-size: 0.8rem; color: var(--muted); }
+.ab-empty { color: var(--muted); font-size: 0.92rem; margin: 4px 0; }
+.ab-item { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-top: 1px solid var(--border); }
+.ab-item:first-child { border-top: none; }
+.ab-info { display: flex; flex-direction: column; min-width: 0; }
+.ab-info strong { overflow-wrap: anywhere; }
+.ab-info span { font-size: 0.85rem; color: var(--muted); font-weight: 500; }
+.ab-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.ab-btns .btn { flex-direction: row; min-height: 42px; font-size: 0.88rem; padding: 4px 12px; border-radius: 12px; }
+.ab-del { margin-left: auto; }
+.ab-player { background: linear-gradient(160deg, #2b86ff, #0b5ce6); color: #fff; border: none; }
+.ab-phead { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.ab-ptitles { display: flex; flex-direction: column; min-width: 0; }
+.ab-ptitles strong { font-size: 1.1rem; overflow-wrap: anywhere; }
+.ab-ptitles span { font-size: 0.85rem; opacity: 0.85; }
+.ab-ptext { margin: 12px 0; min-height: 3em; font-size: 1.05rem; line-height: 1.5; font-weight: 600; }
+.ab-seek { width: 100%; accent-color: #ffbf1f; height: 30px; }
+.ab-times { display: flex; justify-content: space-between; font-size: 0.8rem; opacity: 0.9; font-variant-numeric: tabular-nums; }
+.ab-controls { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 8px; }
+.ab-cbtn, .ab-play {
+  display: grid; place-items: center; border: none; cursor: pointer; color: #fff;
+  background: rgba(255, 255, 255, 0.16); border-radius: 50%; -webkit-tap-highlight-color: transparent;
+}
+.ab-cbtn { width: 50px; height: 50px; font-size: 1.2rem; line-height: 1; }
+.ab-cbtn small { font-size: 0.6rem; font-weight: 700; }
+.ab-play { width: 70px; height: 70px; font-size: 1.8rem; background: #fff; color: #0b5ce6; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2); }
+.ab-cbtn:active, .ab-play:active { transform: scale(0.95); }
+.ab-rate { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 10px; font-size: 0.85rem; font-weight: 600; }
+.ab-rate select { font: inherit; padding: 6px 8px; border-radius: 10px; border: none; background: rgba(255, 255, 255, 0.2); color: #fff; }
+.ab-rate select option { color: #000; }
+.ab-player .sheet-close { background: rgba(255, 255, 255, 0.2); color: #fff; box-shadow: none; }
+
 /* ---------- Pagine ---------- */
 #viewPages { padding: 0; overflow: hidden; background: var(--pages-bg); }
 .pages-scroll {
@@ -650,8 +696,8 @@ body.sheet-open #views .view { overflow: hidden; }
   position: absolute;
   border-radius: 50%;
 }
-.tabbar .blob-green { width: 190px; height: 140px; left: -95px; bottom: -92px; background: var(--green); }
-.tabbar .blob-pink { width: 200px; height: 160px; right: -120px; bottom: -112px; background: var(--pink); }
+.tabbar .blob-green { width: 150px; height: 110px; left: -100px; bottom: -78px; background: var(--green); }
+.tabbar .blob-pink { width: 160px; height: 120px; right: -112px; bottom: -84px; background: var(--pink); }
 .tab {
   flex: 1;
   display: flex;
